@@ -1,0 +1,31 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/v1/server-card.schema.json",
+  "name": "io.github.xuniwattoo/gs-mcp",
+  "version": "1.0.0",
+  "title": "Global Shopaholics",
+  "description": "Buy from any US store and ship worldwide: shipping rates, landed cost, assisted purchase, tracking.",
+  "websiteUrl": "https://globalshopaholics.com/mcp/",
+  "repository": {
+    "url": "https://github.com/xuniwattoo/gs-mcp",
+    "source": "github"
+  },
+  "icons": [
+    {
+      "src": "https://globalshopaholics.com/wp-content/uploads/2026/09/cropped-Favicon-192x192.png",
+      "mimeType": "image/png",
+      "sizes": [
+        "192x192"
+      ]
+    }
+  ],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.globalshopaholics.com/mcp",
+      "supportedProtocolVersions": [
+        "2025-06-18",
+        "2025-11-25"
+      ]
+    }
+  ]
+}

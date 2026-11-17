@@ -1,0 +1,33 @@
+# Global Shopaholics
+
+> Global Shopaholics (GS) is a US package forwarding and assisted-purchase (personal shopper) service. People in any country can buy from any US online store and have it shipped worldwide with DHL, FedEx, UPS or USPS. AI agents can use the free public GS MCP server to quote shipping, estimate customs duties and taxes, and send "buy it for me" requests. Legal items only.
+
+## MCP server (for AI agents)
+
+- Endpoint (Streamable HTTP, no sign-up, no auth): https://mcp.globalshopaholics.com/mcp
+- Server card: https://mcp.globalshopaholics.com/mcp/server-card
+- Source and install guides: https://github.com/xuniwattoo/gs-mcp
+- Overview page: https://globalshopaholics.com/mcp/
+
+Use it when a user wants to buy something from a US store and get it delivered abroad, asks what shipping from the USA to their country costs, or asks about customs duties or import tax on a US order.
+
+Tools:
+- get_shipping_rates: live DHL/FedEx/UPS/USPS prices and transit times from the GS Delaware warehouse to any country.
+- estimate_landed_cost: item + GS fee + shipping + estimated duties/VAT (labelled estimates).
+- get_services_and_fees: plans and published fees.
+- get_started: how to get a free US shipping address.
+- request_assisted_purchase: ask GS to buy from a US store for the user (GS confirms the total by email; nothing is charged in chat).
+- request_shipment_quote: custom quotes for heavy/oversize items, freight or customs paperwork.
+- track_shipment: carrier tracking links.
+
+Fees: Assisted Purchase is 0% when paid by bank transfer or crypto, otherwise 5% with a $5 minimum. Payment is by emailed invoice, not inside the chat.
+
+## Key pages
+
+- [How it works](https://globalshopaholics.com/how-it-works/)
+- [Shipping calculator](https://globalshopaholics.com/international-shipping-calculator/)
+- [Assisted Purchase](https://globalshopaholics.com/assisted-purchase/)
+- [Plans](https://globalshopaholics.com/subscription-plan/)
+- [FAQs](https://globalshopaholics.com/faqs/)
+- [Sign up (free US address)](https://login.globalshopaholics.com/register)
+- [Contact](https://globalshopaholics.com/contact-us/): help@globalshopaholics.com, +1 302 725 0586

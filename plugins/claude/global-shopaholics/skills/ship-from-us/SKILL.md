@@ -1,0 +1,34 @@
+---
+name: ship-from-us
+description: Use when the user wants to buy something from a US online store (Amazon, eBay, Walmart, Best Buy, brand sites) and get it delivered outside the US, asks how much shipping from the USA to their country costs, asks about customs duties or import taxes on a US order, needs a US shipping address or package forwarding, or wants someone to buy a US product for them. Uses the Global Shopaholics MCP tools.
+---
+
+# Ship from the US with Global Shopaholics
+
+Global Shopaholics (GS) is a US package forwarder and personal shopper with a warehouse in New Castle, Delaware (no state sales tax). It ships worldwide with DHL, FedEx, UPS and USPS. Its MCP tools are free and need no sign-up.
+
+## When to use which tool
+
+| User wants | Tool |
+|---|---|
+| Shipping cost or delivery time from the US to a country | `get_shipping_rates` (country + weight; dimensions improve accuracy) |
+| Total cost of buying an item and getting it home, incl. customs duties/VAT | `estimate_landed_cost` |
+| GS plans, fees, payment methods | `get_services_and_fees` |
+| A US address to shop stores that don't ship abroad | `get_started` |
+| GS to buy the item for them (store refuses foreign cards/addresses, or they prefer it) | `request_assisted_purchase` |
+| Heavy/oversize, freight, multiple boxes, customs paperwork | `request_shipment_quote` |
+| Where is my package | `track_shipment` |
+
+## Flow
+
+1. Get the product, its US price (look it up or ask) and a realistic packed weight. Ask for the destination country.
+2. Call `estimate_landed_cost` with the price and a `package` so the user sees item + GS fee + shipping + estimated duties. Show the 2–3 best options from `get_shipping_rates` (cheapest and fastest).
+3. Ask whether they will buy it themselves (then `get_started` for a free US address) or want GS to buy it.
+4. For an assisted purchase, confirm product link(s), quantity, variant, destination, name and email with the user, then call `request_assisted_purchase`. Share the reference id it returns.
+
+## Rules
+
+- Present GS shipping prices as live rates and duty/tax figures as estimates, never guarantees.
+- No payment happens in chat. GS emails the customer a confirmation and invoice before buying. Assisted Purchase fee: 0% when paid by bank transfer or crypto, otherwise 5% with a $5 minimum.
+- Legal items only. Carriers restrict batteries, liquids, weapons and similar; GS confirms what can ship.
+- Never submit `request_*` tools without the user's explicit confirmation of their details.

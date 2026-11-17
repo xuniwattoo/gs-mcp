@@ -2,6 +2,7 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import { loadConfig, type Config, type EnvRecord } from "./config.js";
 import { canonicalizeClientIp } from "./lib/ip.js";
 import { createServer, SERVER_NAME, SERVER_VERSION, type ServerDeps } from "./server.js";
+import { discoveryResponse } from "./discovery.js";
 
 function cors(cfg: Config, req: Request): Record<string, string> {
   const origin = req.headers.get("origin");
@@ -47,7 +48,9 @@ export async function handleRequest(req: Request, env: EnvRecord = {}, deps: Ser
         status: "ok",
         mcp_endpoint: mcpUrl,
         transport: "streamable-http",
-        docs: "https://globalshopaholics.com/",
+        docs: "https://globalshopaholics.com/mcp/",
+        server_card: `${cfg.publicBaseUrl ?? url.origin}/mcp/server-card`,
+        llms_txt: `${cfg.publicBaseUrl ?? url.origin}/llms.txt`,
         limiter: deps.limiterBackend ?? (deps.limiter ? "custom" : "memory"),
         limiter_ok: deps.limiterStatus ? deps.limiterStatus.ok : undefined,
         rate_limit_per_hour: cfg.rateLimitPerHour,
@@ -57,6 +60,10 @@ export async function handleRequest(req: Request, env: EnvRecord = {}, deps: Ser
       },
       { headers: c },
     );
+  }
+  if (req.method === "GET" || req.method === "HEAD") {
+    const d = discoveryResponse(url.pathname, url.origin, env);
+    if (d) return d;
   }
   if (url.pathname !== "/mcp") return new Response("Not found", { status: 404, headers: c });
 

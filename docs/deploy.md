@@ -23,7 +23,7 @@ Non-secret vars live in `wrangler.toml` `[vars]`; secrets via `wrangler secret p
 
 The `LIMITER` Durable Object binding is required for durable limits. Per-IP buckets use `CF-Connecting-IP`, with IPv6 addresses folded to their /64 prefix so privacy/SNAT rotations on the same network share a limit. `wrangler deploy` applies the `v1` SQLite class migration and keeps existing Worker secrets. The in-memory limiter is used automatically when the binding is absent (Node/Vercel).
 
-Assisted-purchase fee: 0% when paid by bank transfer or crypto, otherwise 5% (a minimum currently applies per the published site). Override the percentage or minimum with `GS_ASSISTED_FEE_PCT` and `GS_ASSISTED_FEE_MIN_USD` without a code change.
+Assisted-purchase fee: 0% when paid by bank transfer or crypto, otherwise 5% with a $5 minimum. Override the percentage or minimum with `GS_ASSISTED_FEE_PCT` and `GS_ASSISTED_FEE_MIN_USD` without a code change.
 
 ## 2. Plain Node host (Cloudways fallback)
 

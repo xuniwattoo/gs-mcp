@@ -120,4 +120,4 @@ export const GS_SERVICES = [
 
 /** Owner-stated assisted purchase pricing that is not yet on the public site. */
 export const OWNER_POLICY_NOTE =
-  "GS management confirmed (Nov 2026): 0% assisted-purchase fee when paying by bank transfer or crypto, otherwise 5%. The public FAQ still shows 5% (min $5) for a standard request; GS staff confirm the final fee before buying.";
+  "GS management confirmed (Nov 2026): 0% standard assisted-purchase fee when paying by bank transfer or crypto, otherwise 5% with a $5 minimum. GS staff confirm the final fee before buying.";

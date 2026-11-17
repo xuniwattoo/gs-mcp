@@ -1,0 +1,51 @@
+{
+  "manifest_version": "0.3",
+  "name": "global-shopaholics",
+  "display_name": "Global Shopaholics",
+  "version": "1.0.0",
+  "description": "Buy from any US store and ship worldwide: shipping rates, landed cost, assisted purchase, tracking.",
+  "long_description": "Connects Claude to the free public Global Shopaholics MCP server (https://mcp.globalshopaholics.com/mcp). Get live DHL, FedEx, UPS and USPS rates from the GS US warehouse to any country, estimate total landed cost including customs duties and import taxes, get a free US shipping address, and ask Global Shopaholics to buy an item from any US store for you. GS confirms every order and its total by email before buying; nothing is charged in chat. Legal items only.",
+  "author": {
+    "name": "Global Shopaholics",
+    "email": "help@globalshopaholics.com",
+    "url": "https://globalshopaholics.com/"
+  },
+  "repository": { "type": "git", "url": "https://github.com/xuniwattoo/gs-mcp" },
+  "homepage": "https://globalshopaholics.com/mcp/",
+  "documentation": "https://github.com/xuniwattoo/gs-mcp#readme",
+  "support": "https://globalshopaholics.com/contact-us/",
+  "icon": "icon.png",
+  "server": {
+    "type": "node",
+    "entry_point": "server/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/server/index.js"]
+    }
+  },
+  "tools": [
+    { "name": "get_shipping_rates", "description": "Live DHL/FedEx/UPS/USPS shipping prices and transit times from the US to any country." },
+    { "name": "estimate_landed_cost", "description": "Item + GS fee + shipping + estimated customs duties and import taxes." },
+    { "name": "get_services_and_fees", "description": "Global Shopaholics services, plans, fees and payment methods." },
+    { "name": "get_started", "description": "Get a free US shipping address for package forwarding." },
+    { "name": "request_assisted_purchase", "description": "Ask GS to buy from any US store for you (confirmed by email; nothing charged in chat)." },
+    { "name": "request_shipment_quote", "description": "Custom quote for heavy/oversize, freight or customs paperwork." },
+    { "name": "track_shipment", "description": "Carrier tracking link for DHL, FedEx, UPS or USPS." }
+  ],
+  "tools_generated": false,
+  "prompts": [
+    {
+      "name": "buy-and-ship",
+      "description": "Estimate the total cost of a US product delivered to your country, then get a US address or ask GS to buy it.",
+      "arguments": ["product", "country"],
+      "text": "I want to buy ${arguments.product} from a US store and get it delivered to ${arguments.country} using Global Shopaholics. Estimate the total landed cost, show the best shipping options, then ask whether I'll buy it myself or want GS to buy it."
+    }
+  ],
+  "keywords": ["shipping", "package forwarding", "US shopping", "customs duties", "international shipping", "personal shopper"],
+  "license": "MIT",
+  "privacy_policies": ["https://globalshopaholics.com/privacy-policy/"],
+  "compatibility": {
+    "platforms": ["darwin", "win32", "linux"],
+    "runtimes": { "node": ">=18.0.0" }
+  }
+}

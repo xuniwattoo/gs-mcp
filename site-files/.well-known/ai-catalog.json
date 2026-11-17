@@ -1,0 +1,10 @@
+{
+  "specVersion": "1.0",
+  "entries": [
+    {
+      "identifier": "urn:air:globalshopaholics.com:mcp:gs-mcp",
+      "type": "application/mcp-server-card+json",
+      "url": "https://mcp.globalshopaholics.com/mcp/server-card"
+    }
+  ]
+}

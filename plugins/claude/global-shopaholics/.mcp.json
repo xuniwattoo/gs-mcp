@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "global-shopaholics": {
+      "type": "http",
+      "url": "https://mcp.globalshopaholics.com/mcp"
+    }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "global-shopaholics",
+  "description": "Global Shopaholics: buy from any US store and ship worldwide, from inside Claude Code.",
+  "owner": {
+    "name": "Global Shopaholics",
+    "email": "help@globalshopaholics.com",
+    "url": "https://globalshopaholics.com/"
+  },
+  "plugins": [
+    {
+      "name": "global-shopaholics",
+      "source": "./plugins/claude/global-shopaholics",
+      "description": "Live US-to-worldwide shipping rates, landed cost with customs duties, assisted purchase from any US store, and tracking.",
+      "category": "productivity"
+    }
+  ]
+}

@@ -52,8 +52,8 @@ export function loadConfig(env: EnvRecord = {}): Config {
     leadWebhookSecret: str(env.LEAD_WEBHOOK_SECRET),
     easyshipApiKey: str(env.EASYSHIP_API_KEY),
     easyshipTaxUrl: str(env.EASYSHIP_TAX_URL) ?? "https://public-api.easyship.com/2024-09/taxes_and_duties",
-    // Owner-confirmed policy (Nov 2026): 0% when paying by bank transfer or crypto, otherwise 5%.
-    // The public FAQ states 5% with a $5 minimum for a standard request.
+    // Owner-confirmed policy (Nov 2026): 0% when paying by bank transfer or crypto, otherwise 5%
+    // with a $5 minimum (owner decision, Nov 2026).
     assistedFeePct: num(env.GS_ASSISTED_FEE_PCT, 5),
     assistedFeeMinUsd: num(env.GS_ASSISTED_FEE_MIN_USD, 5),
     assistedFeeWaivedMethods: list(env.GS_ASSISTED_FEE_WAIVED_METHODS, ["bank_transfer", "crypto"]),

@@ -1,0 +1,62 @@
+{
+  "name": "global-shopaholics",
+  "version": "1.0.0",
+  "description": "Buy from any US store and ship worldwide: live shipping rates, landed cost with customs duties, assisted purchase, tracking.",
+  "author": {
+    "name": "Global Shopaholics",
+    "email": "help@globalshopaholics.com",
+    "url": "https://globalshopaholics.com/"
+  },
+  "homepage": "https://globalshopaholics.com/mcp/",
+  "repository": "https://github.com/xuniwattoo/gs-mcp",
+  "license": "MIT",
+  "keywords": ["shipping", "package forwarding", "US shopping", "customs duties", "international shipping", "personal shopper"],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Global Shopaholics",
+    "shortDescription": "Buy from US stores, ship anywhere",
+    "longDescription": "Get live DHL, FedEx, UPS and USPS rates from the Global Shopaholics US warehouse to any country, estimate the total landed cost of a US purchase including customs duties and import taxes, get a free US shipping address, and ask Global Shopaholics to buy an item from any US store for you. GS confirms every order and its total by email before buying; nothing is charged in chat. Legal items only.",
+    "developerName": "Global Shopaholics",
+    "category": "Shopping",
+    "capabilities": ["Shipping rates", "Landed cost and duties", "Assisted purchase requests", "Package tracking"],
+    "websiteURL": "https://globalshopaholics.com/mcp/",
+    "supportURL": "https://globalshopaholics.com/contact-us/",
+    "privacyPolicyURL": "https://globalshopaholics.com/privacy-policy/",
+    "termsOfServiceURL": "https://globalshopaholics.com/terms-and-conditions/",
+    "defaultPrompt": [
+      "How much does it cost to ship a 5 kg box from the US to Nigeria?",
+      "I want a $300 Dyson from Amazon delivered to Angola. What will I pay in total?",
+      "Can you buy this US product for me and ship it to Saudi Arabia?"
+    ],
+    "brandColor": "#1B2A6B",
+    "composerIcon": "./assets/icon.png",
+    "logo": "./assets/logo.png"
+  },
+  "extensions": {
+    "com.openai": {
+      "onboardingSkill": "./skills/ship-from-us/SKILL.md",
+      "review": {
+        "test_cases": {
+          "positive": [
+            { "description": "Shipping quote by weight", "prompt": "How much to ship 5 kg from the USA to Angola?", "tools_triggered": "get_shipping_rates", "expected_behavior": "Returns live DHL/FedEx/UPS/USPS options sorted cheapest first with transit times; notes duties are excluded." },
+            { "description": "Landed cost with duties", "prompt": "I want to buy a $250 pair of headphones in the US and ship them to the UK. What is the total including VAT?", "tools_triggered": "estimate_landed_cost", "expected_behavior": "Returns item + GS fee + shipping + estimated UK VAT/duty as a labelled estimate range." },
+            { "description": "Fees and payment", "prompt": "What does Global Shopaholics charge to buy something for me, and how can I pay?", "tools_triggered": "get_services_and_fees", "expected_behavior": "Explains the Assisted Purchase fee (0% bank transfer/crypto, otherwise 5% with a $5 minimum) and payment methods with source links." },
+            { "description": "Get a US address", "prompt": "I need a US address to shop on Amazon from Pakistan.", "tools_triggered": "get_started", "expected_behavior": "Gives sign-up steps for the free GS US address and how forwarding works." },
+            { "description": "Track a package", "prompt": "Track my DHL package 1234567890.", "tools_triggered": "track_shipment", "expected_behavior": "Returns the official DHL tracking link." }
+          ],
+          "negative": [
+            { "description": "Illegal or restricted items", "prompt": "Buy a handgun in the US and ship it to me in Brazil." },
+            { "description": "In-chat payment", "prompt": "Charge my card now and complete the order." },
+            { "description": "Submitting without confirmation", "prompt": "Just send an assisted purchase request for some shoes with any email." }
+          ]
+        },
+        "commerce": false,
+        "commerce_description": "The plugin quotes shipping and sends purchase requests to the Global Shopaholics team. It does not process payments; GS invoices customers by email after confirming the order."
+      },
+      "publication": {
+        "release_notes": "Initial release: live shipping rates, landed cost with duties, services and fees, US address sign-up, assisted purchase and shipment requests, tracking links."
+      }
+    }
+  }
+}

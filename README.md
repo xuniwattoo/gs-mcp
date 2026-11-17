@@ -13,7 +13,7 @@ It only wraps what GS already has: the website's live rate engine, published fee
 | Tool | What it does |
 |---|---|
 | `get_shipping_rates` | Live DHL / FedEx / UPS / USPS prices, transit times, max weight/size, insurance text and dimensional-weight flag from GS's rate engine (`/wp-json/rate-calculator/v2/getrates`), normalized and sorted. |
-| `estimate_landed_cost` | Item + optional US sales tax + GS Assisted Purchase fee (0% when paid by bank transfer or crypto, otherwise 5% (a minimum currently applies per the published site); expedited & executive per GS FAQ) + live shipping + estimated duty/VAT (AO, SA, AE, GB, CA, AU, NG, PK, IN, BR, DE, FR, NL). Optional Easyship Tax & Duty API when `EASYSHIP_API_KEY` and an HS code are given. |
+| `estimate_landed_cost` | Item + optional US sales tax + GS Assisted Purchase fee (0% when paid by bank transfer or crypto, otherwise 5% with a $5 minimum; expedited & executive per GS FAQ) + live shipping + estimated duty/VAT (AO, SA, AE, GB, CA, AU, NG, PK, IN, BR, DE, FR, NL). Optional Easyship Tax & Duty API when `EASYSHIP_API_KEY` and an HS code are given. |
 | `get_services_and_fees` | Services, plans (Basic free, Premium $9.99, Business $14.99) and published fees with source URLs + last-checked date. |
 | `get_started` | How to get the free US address (sign-up: `https://login.globalshopaholics.com/register`) and next steps. |
 | `request_assisted_purchase` | Sends a "buy it for me" request to GS (GoHighLevel and/or webhook), tag `mcp-assisted-purchase`; returns a reference id. Falls back to GS's [Assisted Purchase page](https://globalshopaholics.com/assisted-purchase/) + prefilled email if no sink is configured. |
@@ -38,21 +38,68 @@ npm run stdio                 # stdio transport
 
 ## Connect an AI agent
 
-The public MCP URL is `https://mcp.globalshopaholics.com/mcp`. Fallback: `https://gs-mcp.gshopaholics.workers.dev/mcp`.
+Public MCP URL (Streamable HTTP, free, no sign-up, no auth): **`https://mcp.globalshopaholics.com/mcp`**. Fallback: `https://gs-mcp.gshopaholics.workers.dev/mcp`.
 
-**Claude (claude.ai / Claude Desktop)** – Settings → Connectors → *Add custom connector* → paste `https://mcp.globalshopaholics.com/mcp`. For older Claude Desktop builds without remote connectors, add to `claude_desktop_config.json`:
+[![Install in Cursor](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/en/install-mcp?name=global-shopaholics&config=eyJ1cmwiOiJodHRwczovL21jcC5nbG9iYWxzaG9wYWhvbGljcy5jb20vbWNwIn0=)
+[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_MCP-0098FF?logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect/mcp/install?name=global-shopaholics&config=%7B%22type%22%3A%22http%22%2C%22url%22%3A%22https%3A%2F%2Fmcp.globalshopaholics.com%2Fmcp%22%7D)
+[![Install in VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-Install_MCP-24bfa5?logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=global-shopaholics&config=%7B%22type%22%3A%22http%22%2C%22url%22%3A%22https%3A%2F%2Fmcp.globalshopaholics.com%2Fmcp%22%7D&quality=insiders)
+[![Claude Desktop extension](https://img.shields.io/badge/Claude_Desktop-.mcpb-D97757)](https://github.com/xuniwattoo/gs-mcp/releases/latest/download/global-shopaholics.mcpb)
+
+**Claude Code** – plugin (adds the server plus a `ship-from-us` skill that tells Claude when to use it):
+
+```
+/plugin marketplace add xuniwattoo/gs-mcp
+/plugin install global-shopaholics@global-shopaholics
+```
+
+On Claude Code 2.1.275+ one step works: `/plugin install global-shopaholics --marketplace xuniwattoo/gs-mcp`
+
+Or just the server: `claude mcp add --transport http global-shopaholics https://mcp.globalshopaholics.com/mcp`
+
+**Claude.ai / Claude Desktop** – Settings → Connectors → *Add custom connector* → name `Global Shopaholics`, URL `https://mcp.globalshopaholics.com/mcp`. Or download [`global-shopaholics.mcpb`](https://github.com/xuniwattoo/gs-mcp/releases/latest/download/global-shopaholics.mcpb) and double-click it (Claude Desktop → Settings → Extensions). Manual config for older builds:
 
 ```json
 { "mcpServers": { "global-shopaholics": { "command": "npx", "args": ["-y", "mcp-remote", "https://mcp.globalshopaholics.com/mcp"] } } }
 ```
 
-**ChatGPT** – Settings → Apps & Connectors → Advanced → enable Developer mode → *Create* connector → MCP server URL `https://mcp.globalshopaholics.com/mcp`, authentication *No authentication*.
+**ChatGPT** – Settings → Apps & Connectors → Advanced settings → turn on *Developer mode* → *Create* → MCP server URL `https://mcp.globalshopaholics.com/mcp`, authentication *No authentication*.
 
-**Cursor** – `~/.cursor/mcp.json` (or `.cursor/mcp.json` in a project):
+**Codex (CLI, IDE, ChatGPT desktop)** – `codex mcp add global-shopaholics --url https://mcp.globalshopaholics.com/mcp`, or in `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.global-shopaholics]
+url = "https://mcp.globalshopaholics.com/mcp"
+```
+
+A Codex/ChatGPT plugin package (server + skill) is in [`plugins/openai/global-shopaholics`](plugins/openai/global-shopaholics).
+
+**Cursor** – click the button above, or `~/.cursor/mcp.json`:
 
 ```json
 { "mcpServers": { "global-shopaholics": { "url": "https://mcp.globalshopaholics.com/mcp" } } }
 ```
+
+[Direct deeplink](cursor://anysphere.cursor-deeplink/mcp/install?name=global-shopaholics&config=eyJ1cmwiOiJodHRwczovL21jcC5nbG9iYWxzaG9wYWhvbGljcy5jb20vbWNwIn0=): `cursor://anysphere.cursor-deeplink/mcp/install?name=global-shopaholics&config=eyJ1cmwiOiJodHRwczovL21jcC5nbG9iYWxzaG9wYWhvbGljcy5jb20vbWNwIn0=`
+
+**VS Code (Copilot agent mode)** – click the button above, or `code --add-mcp '{"name":"global-shopaholics","type":"http","url":"https://mcp.globalshopaholics.com/mcp"}'`, or `.vscode/mcp.json`:
+
+```json
+{ "servers": { "global-shopaholics": { "type": "http", "url": "https://mcp.globalshopaholics.com/mcp" } } }
+```
+
+**Windsurf** – `~/.codeium/windsurf/mcp_config.json`:
+
+```json
+{ "mcpServers": { "global-shopaholics": { "serverUrl": "https://mcp.globalshopaholics.com/mcp" } } }
+```
+
+**Gemini CLI** – `gemini mcp add --transport http global-shopaholics https://mcp.globalshopaholics.com/mcp`, or `~/.gemini/settings.json`:
+
+```json
+{ "mcpServers": { "global-shopaholics": { "httpUrl": "https://mcp.globalshopaholics.com/mcp" } } }
+```
+
+**Cline / Roo / other clients** – add a remote server of type *Streamable HTTP* with URL `https://mcp.globalshopaholics.com/mcp`.
 
 **curl**
 
@@ -60,6 +107,14 @@ The public MCP URL is `https://mcp.globalshopaholics.com/mcp`. Fallback: `https:
 curl -s -X POST https://mcp.globalshopaholics.com/mcp -H 'content-type: application/json' -H 'accept: application/json, text/event-stream' \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"get_shipping_rates","arguments":{"country":"AO","weight":5,"unit":"kg"}}}'
 ```
+
+### Discovery
+
+- Server card: `https://mcp.globalshopaholics.com/mcp/server-card` (also `/.well-known/mcp/server-card.json`)
+- AI catalog: `https://mcp.globalshopaholics.com/.well-known/ai-catalog.json`
+- `https://mcp.globalshopaholics.com/llms.txt`
+- Official MCP Registry name: `io.github.xuniwattoo/gs-mcp` ([server.json](server.json))
+- Copies for globalshopaholics.com: [`site-files/`](site-files)
 
 ## Configuration
 
@@ -86,5 +141,10 @@ src/data/*.ts            GS facts (sourced), duty rules (sourced), GS calculator
 test/                    vitest tests + fixture (real GS response, Angola 5 kg)
 scripts/smoke.ts         end-to-end smoke test
 docs/                    website page copy, deploy guide
+src/discovery.ts         server card, AI catalog, llms.txt (served by the Worker)
+site-files/              discovery files to publish on globalshopaholics.com
+.claude-plugin/          Claude Code marketplace (plugins/claude/global-shopaholics)
+plugins/openai/          Codex / ChatGPT plugin package
+mcpb/                    Claude Desktop extension (stdio relay to the remote server); `npm run mcpb:build`
 server.json              MCP registry manifest
 ```

@@ -1,0 +1,19 @@
+{
+  "name": "global-shopaholics",
+  "displayName": "Global Shopaholics",
+  "version": "1.0.0",
+  "description": "Buy from any US store and ship worldwide: live shipping rates, landed cost with customs duties, assisted purchase, tracking.",
+  "author": {
+    "name": "Global Shopaholics",
+    "email": "help@globalshopaholics.com",
+    "url": "https://globalshopaholics.com/"
+  },
+  "homepage": "https://globalshopaholics.com/mcp/",
+  "repository": "https://github.com/xuniwattoo/gs-mcp",
+  "license": "MIT",
+  "keywords": ["shipping", "package-forwarding", "us-shopping", "customs-duties", "international-shipping", "personal-shopper"],
+  "icon": "./icon.png",
+  "documentationUrl": "https://github.com/xuniwattoo/gs-mcp#readme",
+  "supportUrl": "https://globalshopaholics.com/contact-us/",
+  "termsOfServiceUrl": "https://globalshopaholics.com/terms-and-conditions/"
+}

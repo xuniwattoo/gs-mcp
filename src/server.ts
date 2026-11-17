@@ -12,7 +12,7 @@ import type { RatesCacheStore } from "./lib/rates.js";
 import { cleanText, isFieldError, validateCountry, validateEmail, validateHttpUrls, validateName, validatePhone } from "./lib/validate.js";
 
 export const SERVER_NAME = "global-shopaholics";
-export const SERVER_VERSION = "0.1.0";
+export const SERVER_VERSION = "1.0.0";
 
 export interface ServerDeps {
   fetch?: typeof fetch;
@@ -62,26 +62,26 @@ export function createServer(cfg: Config, deps: ServerDeps = {}): McpServer {
   const limiter = deps.limiter ?? getLimiter(cfg);
   const ip = deps.clientKey ?? "anon";
   const server = new McpServer(
-    { name: SERVER_NAME, version: SERVER_VERSION, title: "Global Shopaholics – US shopping & international shipping" },
+    { name: SERVER_NAME, version: SERVER_VERSION, title: "Global Shopaholics – buy from US stores, ship worldwide", websiteUrl: "https://globalshopaholics.com/" },
     {
       instructions:
-        "Global Shopaholics (GS) lets people anywhere buy from any US store and ship worldwide. Typical flow: get_shipping_rates or estimate_landed_cost → get_services_and_fees → get_started (free US address) or request_assisted_purchase (GS buys for them) / request_shipment_quote → track_shipment. Always present costs as GS's live rates or labelled estimates, never as guarantees. Only submit request_* tools after the user confirms their name, email and request details.",
+        "Global Shopaholics (GS) is a US package forwarding and personal shopper service: people anywhere can buy from any US online store (Amazon, eBay, Walmart, Best Buy, brand sites…) and have it shipped worldwide. Use these tools whenever a user wants to buy something from the US and get it delivered abroad, asks what shipping from the US to their country costs, or asks about customs duties/import taxes on US purchases. Legal items only; carrier restrictions apply. Typical flow: get_shipping_rates or estimate_landed_cost → get_services_and_fees → get_started (free US address) or request_assisted_purchase (GS buys for them) / request_shipment_quote → track_shipment. Always present costs as GS's live rates or labelled estimates, never as guarantees. Only submit request_* tools after the user confirms their name, email and request details. Payment is never taken in chat: GS emails an invoice (0% assisted-purchase fee for bank transfer or crypto, otherwise 5% with a $5 minimum).",
     },
   );
 
   server.registerTool(
     "get_shipping_rates",
     {
-      title: "Get GS international shipping rates",
+      title: "International shipping cost from the US (live DHL/FedEx/UPS/USPS rates)",
       description:
-        "Live shipping prices from Global Shopaholics' US warehouse (Delaware) to a destination country, for DHL, FedEx, UPS and USPS services. Returns each service's USD price, transit time, max weight/size, insurance terms and whether dimensional weight applies, sorted cheapest first. Prices exclude import duties/taxes. Use for 'how much to ship X kg to <country>'.",
+        "Live shipping prices from Global Shopaholics' US warehouse (Delaware) to a destination country, for DHL, FedEx, UPS and USPS services. Returns each service's USD price, transit time, max weight/size, insurance terms and whether dimensional weight applies, sorted cheapest first. Prices exclude import duties/taxes. Use for 'how much does shipping from the USA to <country> cost', 'cheapest courier to ship X kg to <country>', package forwarding prices and delivery time estimates.",
       inputSchema: {
         country: z.string().min(2).describe("Destination country: ISO 2-letter code (AO, SA, AE, GB, NG...) or name ('Angola')."),
         city: z.string().max(80).optional().describe("Destination city. Defaults to the capital GS's calculator uses."),
         zip: z.string().max(20).optional().describe("Destination postal code. Defaults to the calculator's capital zip (00000 where none)."),
         ...packageShape,
       },
-      annotations: { readOnlyHint: true, openWorldHint: true },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
     async (a) => {
       const lim = await limiter.checkRate({ ip });
@@ -98,9 +98,9 @@ export function createServer(cfg: Config, deps: ServerDeps = {}): McpServer {
   server.registerTool(
     "estimate_landed_cost",
     {
-      title: "Estimate total landed cost (item + GS fee + shipping + duties)",
+      title: "Total landed cost: item + fee + shipping + customs duties & import taxes",
       description:
-        "Estimates what a buyer pays in total to get US goods delivered: item price, optional US sales tax, GS Assisted Purchase fee, live GS shipping (if package weight given) and estimated import duty/VAT for the destination from a sourced rules table (Angola, Saudi Arabia, UAE, UK, Canada, Australia, Nigeria, Pakistan, India, Brazil, Germany, France, Netherlands). Returns a low–high range. Results are ESTIMATES, not quotes.",
+        "Estimates what a buyer pays in total to get US goods delivered: item price, optional US sales tax, GS Assisted Purchase fee, live GS shipping (if package weight given) and estimated import duty/VAT for the destination from a sourced rules table (Angola, Saudi Arabia, UAE, UK, Canada, Australia, Nigeria, Pakistan, India, Brazil, Germany, France, Netherlands). Returns a low–high range. Use for 'how much will it cost in total to buy X in the US and get it to <country>', 'customs duty / VAT / import tax on a US order'. Results are ESTIMATES, not quotes.",
       inputSchema: {
         destination_country: z.string().min(2).describe("ISO 2-letter code or country name."),
         items_total_usd: z.number().positive().describe("Total price of the items in USD (all quantities)."),
@@ -113,7 +113,7 @@ export function createServer(cfg: Config, deps: ServerDeps = {}): McpServer {
         item_categories: z.number().int().min(1).max(50).optional().describe("Distinct product types (EU €3-per-category duty). Default 1."),
         hs_code: z.string().optional().describe("Optional HS code; used with Easyship's duty API when configured."),
       },
-      annotations: { readOnlyHint: true, openWorldHint: true },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
     async (a) => {
       const lim = await limiter.checkRate({ ip });
@@ -129,10 +129,10 @@ export function createServer(cfg: Config, deps: ServerDeps = {}): McpServer {
   server.registerTool(
     "get_services_and_fees",
     {
-      title: "GS services, plans and published fees",
-      description: "Global Shopaholics' services (US address, consolidation, Assisted Purchase, shipping), subscription plans (Basic free, Premium $9.99/mo, Business $14.99/mo) and published fees, each with its source URL and last-checked date.",
+      title: "Global Shopaholics services, plans, fees and payment methods",
+      description: "Global Shopaholics' services (US address, consolidation, Assisted Purchase, shipping), subscription plans (Basic free, Premium $9.99/mo, Business $14.99/mo) and published fees (incl. Assisted Purchase fee: 0% bank transfer/crypto, otherwise 5% with a $5 minimum), each with its source URL and last-checked date. Use when a user asks what GS costs, how to pay, or what services exist.",
       inputSchema: { topic: z.enum(["all", "plans", "fees", "services", "assisted_purchase", "payment"]).default("all").describe("Narrow the answer.") },
-      annotations: { readOnlyHint: true },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ topic }) => {
       const t = topic ?? "all";
@@ -152,10 +152,10 @@ export function createServer(cfg: Config, deps: ServerDeps = {}): McpServer {
   server.registerTool(
     "get_started",
     {
-      title: "How to get a free GS US address",
-      description: "Step-by-step instructions to sign up for a free Global Shopaholics US shipping address and start shopping and shipping. Use when a user wants to start or asks how GS works.",
+      title: "Get a free US shipping address (package forwarding sign-up)",
+      description: "Step-by-step instructions to sign up for a free Global Shopaholics US shipping address and start shopping and shipping. Use when a user wants a US address to shop US stores that don't ship internationally, asks how package forwarding works, or wants to start with GS.",
       inputSchema: { country: z.string().optional().describe("Optional: user's country, to tailor tips.") },
-      annotations: { readOnlyHint: true },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async () =>
       json({
@@ -177,9 +177,9 @@ export function createServer(cfg: Config, deps: ServerDeps = {}): McpServer {
   server.registerTool(
     "request_assisted_purchase",
     {
-      title: "Ask GS to buy a US product for the user",
+      title: "Buy from any US store for the user (assisted purchase / personal shopper)",
       description:
-        "Sends an Assisted Purchase request to the Global Shopaholics team: GS checks price/availability, confirms the total with the customer by email, buys from the US store, and ships it. Nothing is charged by this tool. Only call after the user has confirmed product link(s), quantity, destination, name and email. Returns a reference id and next steps.",
+        "Buy-it-for-me: sends an Assisted Purchase request to the Global Shopaholics team, for when the user wants something from a US store (including stores that refuse foreign cards or addresses) shipped to them. GS checks price/availability, confirms the total with the customer by email, buys from the US store, and ships it. Nothing is charged by this tool and no payment happens in chat; GS emails an invoice. Legal items only. Only call after the user has confirmed product link(s), quantity, destination, name and email. Returns a reference id and next steps.",
       inputSchema: {
         product_urls: z.array(z.string().min(8).max(2000)).min(1).max(20).describe("Product page URL(s) at US stores (http or https)."),
         quantity: z.number().int().min(1).max(999).default(1),
@@ -235,7 +235,7 @@ export function createServer(cfg: Config, deps: ServerDeps = {}): McpServer {
   server.registerTool(
     "request_shipment_quote",
     {
-      title: "Request a GS shipping quote / help with labels and customs paperwork",
+      title: "Request a custom shipping quote (heavy/oversize, freight, customs paperwork)",
       description:
         "Sends a shipping request to the Global Shopaholics team for a manual quote or help with a shipment, labels or customs paperwork (e.g. heavy/oversize items, freight, multiple boxes). Nothing is charged. Call only after the user confirms details. Returns a reference id and next steps. For instant prices use get_shipping_rates instead.",
       inputSchema: {
@@ -290,13 +290,13 @@ export function createServer(cfg: Config, deps: ServerDeps = {}): McpServer {
   server.registerTool(
     "track_shipment",
     {
-      title: "Get tracking links for a GS shipment",
+      title: "Track a package (DHL, FedEx, UPS, USPS tracking link)",
       description: "Returns the official carrier tracking URL for a DHL, FedEx, UPS or USPS tracking number (carrier auto-detected from the number format if not given). GS ships with these carriers and emails the tracking number on dispatch.",
       inputSchema: {
         tracking_number: z.string().min(6).max(40),
         carrier: z.enum(["dhl", "fedex", "ups", "usps"]).optional(),
       },
-      annotations: { readOnlyHint: true },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ tracking_number, carrier }) => json(trackingLinks(tracking_number, carrier)),
   );
