@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Global Shopaholics MCP server: US shipping rates, landed-cost estimates, assisted purchase and shipment requests for AI agents.",
   "type": "module",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "private": true,
   "engines": {
     "node": ">=20"
