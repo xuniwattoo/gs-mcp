@@ -38,26 +38,26 @@ npm run stdio                 # stdio transport
 
 ## Connect an AI agent
 
-Replace `{{MCP_URL}}` with the deployed URL, e.g. `https://gs-mcp.<account>.workers.dev/mcp` or `https://mcp.globalshopaholics.com/mcp`.
+The public MCP URL is `https://mcp.globalshopaholics.com/mcp`. Fallback: `https://gs-mcp.gshopaholics.workers.dev/mcp`.
 
-**Claude (claude.ai / Claude Desktop)** – Settings → Connectors → *Add custom connector* → paste `{{MCP_URL}}`. For older Claude Desktop builds without remote connectors, add to `claude_desktop_config.json`:
+**Claude (claude.ai / Claude Desktop)** – Settings → Connectors → *Add custom connector* → paste `https://mcp.globalshopaholics.com/mcp`. For older Claude Desktop builds without remote connectors, add to `claude_desktop_config.json`:
 
 ```json
-{ "mcpServers": { "global-shopaholics": { "command": "npx", "args": ["-y", "mcp-remote", "{{MCP_URL}}"] } } }
+{ "mcpServers": { "global-shopaholics": { "command": "npx", "args": ["-y", "mcp-remote", "https://mcp.globalshopaholics.com/mcp"] } } }
 ```
 
-**ChatGPT** – Settings → Apps & Connectors → Advanced → enable Developer mode → *Create* connector → MCP server URL `{{MCP_URL}}`, authentication *No authentication*.
+**ChatGPT** – Settings → Apps & Connectors → Advanced → enable Developer mode → *Create* connector → MCP server URL `https://mcp.globalshopaholics.com/mcp`, authentication *No authentication*.
 
 **Cursor** – `~/.cursor/mcp.json` (or `.cursor/mcp.json` in a project):
 
 ```json
-{ "mcpServers": { "global-shopaholics": { "url": "{{MCP_URL}}" } } }
+{ "mcpServers": { "global-shopaholics": { "url": "https://mcp.globalshopaholics.com/mcp" } } }
 ```
 
 **curl**
 
 ```bash
-curl -s -X POST {{MCP_URL}} -H 'content-type: application/json' -H 'accept: application/json, text/event-stream' \
+curl -s -X POST https://mcp.globalshopaholics.com/mcp -H 'content-type: application/json' -H 'accept: application/json, text/event-stream' \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"get_shipping_rates","arguments":{"country":"AO","weight":5,"unit":"kg"}}}'
 ```
 

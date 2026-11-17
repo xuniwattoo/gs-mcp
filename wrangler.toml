@@ -4,8 +4,7 @@ compatibility_date = "2026-11-01"
 compatibility_flags = ["nodejs_compat"]
 workers_dev = true
 
-# Optional custom domain once DNS is on Cloudflare (globalshopaholics.com already is):
-# routes = [{ pattern = "mcp.globalshopaholics.com", custom_domain = true }]
+routes = [{ pattern = "mcp.globalshopaholics.com", custom_domain = true, zone_name = "globalshopaholics.com" }]
 
 [vars]
 GS_RATES_URL = "https://globalshopaholics.com/wp-json/rate-calculator/v2/getrates"
@@ -19,9 +18,10 @@ GS_ASSISTED_FEE_PCT = "5"
 GS_ASSISTED_FEE_MIN_USD = "5"
 GS_ASSISTED_FEE_WAIVED_METHODS = "bank_transfer,crypto"
 ALLOWED_ORIGINS = "*"
+GHL_LOCATION_ID = "cbpCVcgP2Eci9eEvs2Xc"
 
 # Secrets (set with `wrangler secret put NAME`, never commit):
-# GS_RATES_HEADER_NAME, GS_RATES_HEADER_VALUE, GHL_API_TOKEN, GHL_LOCATION_ID,
+# GS_RATES_HEADER_NAME, GS_RATES_HEADER_VALUE, GHL_API_TOKEN,
 # LEAD_WEBHOOK_URL, LEAD_WEBHOOK_SECRET, EASYSHIP_API_KEY
 
 # SQLite-backed Durable Object (Workers free plan). Stores lead + rate-tool limits.

@@ -7,14 +7,15 @@ Every request builds a fresh MCP server (no MCP sessions). On Cloudflare Workers
 ```bash
 npm install
 npx wrangler login                       # once, opens browser
-npx wrangler secret put GHL_API_TOKEN     # optional, repeat for each secret below
-npx wrangler secret put GHL_LOCATION_ID
+# If this login can see more than one account, target the GS account:
+export CLOUDFLARE_ACCOUNT_ID=bd278cd7f2b3921e4b3c9eeff0a95396
+npx wrangler secret put GHL_API_TOKEN     # optional; required for leads to reach GHL
 npm run cf:deploy                         # = wrangler deploy
 ```
 
-Result: `https://gs-mcp.<your-subdomain>.workers.dev/mcp`. Check `https://…/health`.
+Live MCP URL: `https://mcp.globalshopaholics.com/mcp`. Check `https://mcp.globalshopaholics.com/health`.
 
-Custom domain: globalshopaholics.com already uses Cloudflare, so uncomment the `routes` line in `wrangler.toml` (`mcp.globalshopaholics.com`, `custom_domain = true`) and redeploy. MCP URL becomes `https://mcp.globalshopaholics.com/mcp`.
+`wrangler.toml` attaches the custom domain `mcp.globalshopaholics.com` on the `globalshopaholics.com` zone (`custom_domain = true`) and also publishes the workers.dev fallback `https://gs-mcp.gshopaholics.workers.dev/mcp`. `GHL_LOCATION_ID` is a plain `[vars]` value, not a secret.
 
 Free-plan fit: bundle ≈ 265 KB gzip (limit 3 MB). The rate engine takes ~10 s to answer, but waiting on `fetch` is wall-clock time, not CPU time, so the 10 ms CPU limit is not an issue. 100k requests/day free.
 
@@ -57,7 +58,7 @@ Cloudways application servers are PHP-first; Node needs SSH access and a custom 
 | `GS_RATES_TIMEOUT_MS` | `25000` | Upstream timeout |
 | `GS_USER_AGENT` | `GlobalShopaholics-MCP/0.1 (+https://globalshopaholics.com)` | Honest, identifiable UA |
 | `GHL_API_TOKEN` | – | GoHighLevel private integration token (scopes: contacts.write, contacts.readonly) (secret) |
-| `GHL_LOCATION_ID` | – | GHL sub-account/location id |
+| `GHL_LOCATION_ID` | (set in `wrangler.toml` `[vars]`) | GHL sub-account/location id |
 | `GHL_API_BASE` | `https://services.leadconnectorhq.com` | GHL API v2 base |
 | `LEAD_WEBHOOK_URL` | – | Generic webhook for leads (Zapier/Make/internal) (secret) |
 | `LEAD_WEBHOOK_SECRET` | – | HMAC-SHA256 key → `x-gs-signature: sha256=<hex>` header (secret) |

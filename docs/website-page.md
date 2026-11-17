@@ -4,7 +4,7 @@
 
 Use ChatGPT, Claude, Cursor, Grok or any AI assistant that supports the **Model Context Protocol (MCP)** to shop US stores and ship worldwide with Global Shopaholics. Your assistant can check live shipping prices, estimate duties, explain our plans and send us a buy-for-me request – right inside the chat.
 
-**MCP server URL:** `{{MCP_URL}}`
+**MCP server URL:** `https://mcp.globalshopaholics.com/mcp`
 No login or API key needed.
 
 ## What your AI agent can do
@@ -19,17 +19,17 @@ No login or API key needed.
 
 ## Set it up
 
-**ChatGPT** – Settings → Apps & Connectors → Advanced → turn on Developer mode → Create → paste `{{MCP_URL}}` → No authentication.
+**ChatGPT** – Settings → Apps & Connectors → Advanced → turn on Developer mode → Create → paste `https://mcp.globalshopaholics.com/mcp` → No authentication.
 
-**Claude** – Settings → Connectors → Add custom connector → paste `{{MCP_URL}}`.
+**Claude** – Settings → Connectors → Add custom connector → paste `https://mcp.globalshopaholics.com/mcp`.
 
 **Cursor** – add to `~/.cursor/mcp.json`:
 
 ```json
-{ "mcpServers": { "global-shopaholics": { "url": "{{MCP_URL}}" } } }
+{ "mcpServers": { "global-shopaholics": { "url": "https://mcp.globalshopaholics.com/mcp" } } }
 ```
 
-**Other MCP clients** – add a remote server with Streamable HTTP transport at `{{MCP_URL}}`.
+**Other MCP clients** – add a remote server with Streamable HTTP transport at `https://mcp.globalshopaholics.com/mcp`.
 
 ## Try asking
 
