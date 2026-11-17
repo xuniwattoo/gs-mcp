@@ -2,13 +2,13 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
   "name": "com.globalshopaholics/gs-mcp",
   "title": "Global Shopaholics",
-  "description": "Buy from any US store and ship worldwide: live GS shipping rates, landed-cost estimates, Assisted Purchase and shipment requests, tracking links.",
+  "description": "Buy from any US store and ship worldwide: shipping rates, landed cost, assisted purchase, tracking.",
   "version": "0.1.0",
   "websiteUrl": "https://globalshopaholics.com/",
   "remotes": [
     {
       "type": "streamable-http",
-      "url": "{{MCP_URL}}"
+      "url": "https://gs-mcp.muhammad-fab.workers.dev/mcp"
     }
   ]
 }
