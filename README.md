@@ -6,14 +6,14 @@ It only wraps what GS already has: the website's live rate engine, published fee
 
 - Transport: **Streamable HTTP** (stateless, JSON responses) at `/mcp`, plus a **stdio** entry.
 - Runtime: web-standard `Request`/`Response` → runs on **Cloudflare Workers (primary)**, Vercel, or any Node ≥ 20 host (Cloudways).
-- No auth for read tools; the two lead tools are rate-limited per client IP (in-memory, no database).
+- No auth for read tools. Lead tools are rate-limited per IP (hourly), per email (daily) and by a global daily cap; rate-lookup tools have a per-IP hourly cap. On Cloudflare Workers these limits live in a SQLite Durable Object; Node/Vercel fall back to a per-process in-memory limiter.
 
 ## Tools
 
 | Tool | What it does |
 |---|---|
 | `get_shipping_rates` | Live DHL / FedEx / UPS / USPS prices, transit times, max weight/size, insurance text and dimensional-weight flag from GS's rate engine (`/wp-json/rate-calculator/v2/getrates`), normalized and sorted. |
-| `estimate_landed_cost` | Item + optional US sales tax + GS Assisted Purchase fee (0% bank transfer/crypto, else 5% / $5 min; expedited & executive per GS FAQ) + live shipping + estimated duty/VAT (AO, SA, AE, GB, CA, AU, NG, PK, IN, BR, DE, FR, NL). Optional Easyship Tax & Duty API when `EASYSHIP_API_KEY` and an HS code are given. |
+| `estimate_landed_cost` | Item + optional US sales tax + GS Assisted Purchase fee (0% when paid by bank transfer or crypto, otherwise 5% (a minimum currently applies per the published site); expedited & executive per GS FAQ) + live shipping + estimated duty/VAT (AO, SA, AE, GB, CA, AU, NG, PK, IN, BR, DE, FR, NL). Optional Easyship Tax & Duty API when `EASYSHIP_API_KEY` and an HS code are given. |
 | `get_services_and_fees` | Services, plans (Basic free, Premium $9.99, Business $14.99) and published fees with source URLs + last-checked date. |
 | `get_started` | How to get the free US address (sign-up: `https://login.globalshopaholics.com/register`) and next steps. |
 | `request_assisted_purchase` | Sends a "buy it for me" request to GS (GoHighLevel and/or webhook), tag `mcp-assisted-purchase`; returns a reference id. Falls back to GS's [Assisted Purchase page](https://globalshopaholics.com/assisted-purchase/) + prefilled email if no sink is configured. |
@@ -78,7 +78,9 @@ api/mcp.ts, vercel.json  Vercel entry
 src/lib/rates.ts         GS rate engine client + normalizer + 10-min cache
 src/lib/landed.ts        landed-cost estimator, GS fee logic, optional Easyship
 src/lib/leads.ts         GoHighLevel v2 / webhook lead sinks + fallback
-src/lib/ratelimit.ts     in-memory limiter
+src/lib/ratelimit.ts     limiter contract + in-memory fallback
+src/lib/limiter-do.ts    SQLite Durable Object limiter (Workers)
+src/lib/validate.ts      lead-input sanitization and checks
 src/lib/tracking.ts      carrier detection + URLs
 src/data/*.ts            GS facts (sourced), duty rules (sourced), GS calculator country list
 test/                    vitest tests + fixture (real GS response, Angola 5 kg)

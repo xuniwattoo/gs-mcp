@@ -1,6 +1,6 @@
 # Deploying the GS MCP server
 
-The server is stateless (no sessions, no database). Every request builds a fresh MCP server, so it scales horizontally and fits serverless free tiers. Caching (rates, 10 min) and lead rate-limiting are in-memory per isolate/process.
+Every request builds a fresh MCP server (no MCP sessions). On Cloudflare Workers, lead and rate-tool limits are stored in a SQLite-backed Durable Object (free-plan compatible) and identical rate-engine responses are cached for 10 minutes (in-memory plus the Cache API). Node and Vercel use the same limiter contract in memory (per process; resets on restart) and the 10-minute in-memory rates cache only.
 
 ## 1. Cloudflare Workers (primary, free plan)
 
@@ -19,6 +19,10 @@ Custom domain: globalshopaholics.com already uses Cloudflare, so uncomment the `
 Free-plan fit: bundle ≈ 265 KB gzip (limit 3 MB). The rate engine takes ~10 s to answer, but waiting on `fetch` is wall-clock time, not CPU time, so the 10 ms CPU limit is not an issue. 100k requests/day free.
 
 Non-secret vars live in `wrangler.toml` `[vars]`; secrets via `wrangler secret put`.
+
+The `LIMITER` Durable Object binding is required for durable limits. Per-IP buckets use `CF-Connecting-IP`, with IPv6 addresses folded to their /64 prefix so privacy/SNAT rotations on the same network share a limit. `wrangler deploy` applies the `v1` SQLite class migration and keeps existing Worker secrets. The in-memory limiter is used automatically when the binding is absent (Node/Vercel).
+
+Assisted-purchase fee: 0% when paid by bank transfer or crypto, otherwise 5% (a minimum currently applies per the published site). Override the percentage or minimum with `GS_ASSISTED_FEE_PCT` and `GS_ASSISTED_FEE_MIN_USD` without a code change.
 
 ## 2. Plain Node host (Cloudways fallback)
 
@@ -57,11 +61,14 @@ Cloudways application servers are PHP-first; Node needs SSH access and a custom 
 | `GHL_API_BASE` | `https://services.leadconnectorhq.com` | GHL API v2 base |
 | `LEAD_WEBHOOK_URL` | – | Generic webhook for leads (Zapier/Make/internal) (secret) |
 | `LEAD_WEBHOOK_SECRET` | – | HMAC-SHA256 key → `x-gs-signature: sha256=<hex>` header (secret) |
-| `LEAD_RATE_LIMIT_PER_HOUR` | `5` | Per IP, per lead tool |
+| `LEAD_RATE_LIMIT_PER_HOUR` | `5` | Shared per-IP hourly cap across both lead tools |
+| `LEAD_EMAIL_LIMIT_PER_DAY` | `3` | Per-email daily cap (email is lowercased and trimmed; UTC day) |
+| `LEAD_DAILY_CAP` | `200` | Global daily cap on accepted lead submissions (UTC day) |
+| `RATE_LIMIT_PER_HOUR` | `30` | Per-IP hourly cap on `get_shipping_rates` and `estimate_landed_cost` |
 | `EASYSHIP_API_KEY` | – | Optional Easyship Tax & Duty API (secret) |
 | `EASYSHIP_TAX_URL` | `https://public-api.easyship.com/2024-09/taxes_and_duties` | Easyship endpoint |
 | `GS_ASSISTED_FEE_PCT` | `5` | Standard assisted-purchase fee % |
-| `GS_ASSISTED_FEE_MIN_USD` | `5` | Minimum fee (public FAQ) |
+| `GS_ASSISTED_FEE_MIN_USD` | `5` | Minimum standard fee in USD (configurable; default matches the published site) |
 | `GS_ASSISTED_FEE_WAIVED_METHODS` | `bank_transfer,crypto` | Payment methods with 0% standard fee |
 | `ALLOWED_ORIGINS` | `*` | CORS origins (comma list) |
 | `PUBLIC_BASE_URL` | – | Shown in `/health` |

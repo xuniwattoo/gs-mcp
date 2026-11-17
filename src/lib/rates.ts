@@ -47,9 +47,37 @@ export class RatesError extends Error {
 
 type Fetch = typeof fetch;
 const cache = new Map<string, { at: number; value: NormalizedRates }>();
-const CACHE_TTL_MS = 10 * 60 * 1000;
+export const RATES_CACHE_TTL_MS = 10 * 60 * 1000;
+
+/** Optional durable cache (Cloudflare Cache API on Workers) layered under the per-isolate map. */
+export interface RatesCacheStore {
+  get(key: string): Promise<NormalizedRates | undefined> | NormalizedRates | undefined;
+  set(key: string, value: NormalizedRates): Promise<void> | void;
+}
 
 export function clearRatesCache() { cache.clear(); }
+
+export function cacheApiRatesCache(api: { match(request: Request): Promise<Response | undefined>; put(request: Request, response: Response): Promise<void> }, ttlSec = RATES_CACHE_TTL_MS / 1000): RatesCacheStore {
+  const req = (key: string) => new Request(`https://gs-mcp.internal/rates-cache?${encodeURIComponent(key)}`);
+  return {
+    async get(key) {
+      try {
+        const res = await api.match(req(key));
+        if (!res) return undefined;
+        return (await res.json()) as NormalizedRates;
+      } catch {
+        return undefined;
+      }
+    },
+    async set(key, value) {
+      try {
+        await api.put(req(key), new Response(JSON.stringify(value), { headers: { "content-type": "application/json", "cache-control": `public, max-age=${ttlSec}` } }));
+      } catch {
+        /* Cache API may be unavailable in some runtimes */
+      }
+    },
+  };
+}
 
 export function buildRatesForm(input: RatesInput) {
   const c = resolveCountry(input.country);
@@ -117,11 +145,18 @@ export function normalizeRates(raw: any, input: RatesInput, country: { code: str
   };
 }
 
-export async function getShippingRates(input: RatesInput, cfg: Config, fetchImpl: Fetch = fetch): Promise<NormalizedRates> {
+export async function getShippingRates(input: RatesInput, cfg: Config, fetchImpl: Fetch = fetch, store?: RatesCacheStore): Promise<NormalizedRates> {
   const { country, form } = buildRatesForm(input);
   const key = form.toString();
   const hit = cache.get(key);
-  if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.value;
+  if (hit && Date.now() - hit.at < RATES_CACHE_TTL_MS) return hit.value;
+  if (store) {
+    const cached = await store.get(key);
+    if (cached) {
+      cache.set(key, { at: Date.now(), value: cached });
+      return cached;
+    }
+  }
 
   const headers: Record<string, string> = {
     "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
@@ -156,5 +191,6 @@ export async function getShippingRates(input: RatesInput, cfg: Config, fetchImpl
   const value = normalizeRates(raw, input, country, form.get("city")!, form.get("zip_code")!);
   cache.set(key, { at: Date.now(), value });
   if (cache.size > 500) cache.delete(cache.keys().next().value!);
+  await store?.set(key, value);
   return value;
 }

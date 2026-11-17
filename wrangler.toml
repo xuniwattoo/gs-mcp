@@ -12,6 +12,9 @@ GS_RATES_URL = "https://globalshopaholics.com/wp-json/rate-calculator/v2/getrate
 GS_RATES_REFERER = "https://globalshopaholics.com/international-shipping-calculator/"
 GS_USER_AGENT = "GlobalShopaholics-MCP/0.1 (+https://globalshopaholics.com)"
 LEAD_RATE_LIMIT_PER_HOUR = "5"
+LEAD_EMAIL_LIMIT_PER_DAY = "3"
+LEAD_DAILY_CAP = "200"
+RATE_LIMIT_PER_HOUR = "30"
 GS_ASSISTED_FEE_PCT = "5"
 GS_ASSISTED_FEE_MIN_USD = "5"
 GS_ASSISTED_FEE_WAIVED_METHODS = "bank_transfer,crypto"
@@ -20,3 +23,12 @@ ALLOWED_ORIGINS = "*"
 # Secrets (set with `wrangler secret put NAME`, never commit):
 # GS_RATES_HEADER_NAME, GS_RATES_HEADER_VALUE, GHL_API_TOKEN, GHL_LOCATION_ID,
 # LEAD_WEBHOOK_URL, LEAD_WEBHOOK_SECRET, EASYSHIP_API_KEY
+
+# SQLite-backed Durable Object (Workers free plan). Stores lead + rate-tool limits.
+[[durable_objects.bindings]]
+name = "LIMITER"
+class_name = "LimiterDO"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["LimiterDO"]

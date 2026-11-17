@@ -2,7 +2,7 @@ import type { Config } from "../config.js";
 import { findDutyRule, DUTY_RULES } from "../data/duties.js";
 import { GS_URLS, OWNER_POLICY_NOTE } from "../data/gs.js";
 import { resolveCountry } from "./countries.js";
-import { getShippingRates, type NormalizedService, type RatesInput } from "./rates.js";
+import { getShippingRates, type NormalizedService, type RatesInput, type RatesCacheStore } from "./rates.js";
 
 export type PaymentMethod = "card" | "paypal" | "bank_transfer" | "crypto";
 export type RequestType = "none" | "standard" | "expedited" | "executive";
@@ -47,7 +47,7 @@ async function easyship(cfg: Config, countryCode: string, hs: string, customsVal
   return res.json();
 }
 
-export async function estimateLandedCost(input: LandedInput, cfg: Config, fetchImpl: typeof fetch = fetch) {
+export async function estimateLandedCost(input: LandedInput, cfg: Config, fetchImpl: typeof fetch = fetch, store?: RatesCacheStore) {
   const country = resolveCountry(input.destination_country);
   if (!country) throw new Error(`Unknown destination country "${input.destination_country}".`);
   const notes: string[] = [];
@@ -62,7 +62,7 @@ export async function estimateLandedCost(input: LandedInput, cfg: Config, fetchI
   let shippingError: string | undefined;
   if (shipping === undefined && input.package) {
     try {
-      const rates = await getShippingRates({ ...input.package, country: country.code }, cfg, fetchImpl);
+      const rates = await getShippingRates({ ...input.package, country: country.code }, cfg, fetchImpl, store);
       const pool = input.preferred_carrier ? rates.services.filter((s) => s.carrier.toLowerCase().includes(input.preferred_carrier!.toLowerCase())) : rates.services;
       shippingService = pool[0] ?? rates.cheapest;
       shipping = shippingService?.price_usd;

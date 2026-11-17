@@ -6,8 +6,10 @@ import { DUTY_RULES } from "./data/duties.js";
 import { getShippingRates, RatesError } from "./lib/rates.js";
 import { estimateLandedCost } from "./lib/landed.js";
 import { submitLead } from "./lib/leads.js";
-import { RateLimiter } from "./lib/ratelimit.js";
+import { MemoryLimiter, leadLimitMessage, rateLimitMessage, type Limiter, type LimiterConfig } from "./lib/ratelimit.js";
 import { trackingLinks } from "./lib/tracking.js";
+import type { RatesCacheStore } from "./lib/rates.js";
+import { cleanText, isFieldError, validateCountry, validateEmail, validateHttpUrls, validateName, validatePhone } from "./lib/validate.js";
 
 export const SERVER_NAME = "global-shopaholics";
 export const SERVER_VERSION = "0.1.0";
@@ -16,12 +18,24 @@ export interface ServerDeps {
   fetch?: typeof fetch;
   /** Identifies the caller for rate limiting (client IP). */
   clientKey?: string;
-  limiter?: RateLimiter;
+  limiter?: Limiter;
+  ratesCache?: RatesCacheStore;
+  limiterBackend?: "durable-object" | "memory";
+  limiterStatus?: { ok: boolean; rows?: number; error?: string };
 }
 
-let sharedLimiter: RateLimiter | undefined;
+export function limiterConfigFrom(cfg: Config): LimiterConfig {
+  return {
+    leadPerIpPerHour: cfg.leadRateLimitPerHour,
+    leadPerEmailPerDay: cfg.leadEmailLimitPerDay,
+    leadDailyCap: cfg.leadDailyCap,
+    ratePerIpPerHour: cfg.rateLimitPerHour,
+  };
+}
+
+let sharedLimiter: MemoryLimiter | undefined;
 function getLimiter(cfg: Config) {
-  sharedLimiter ??= new RateLimiter(cfg.leadRateLimitPerHour, 60 * 60 * 1000);
+  sharedLimiter ??= new MemoryLimiter(limiterConfigFrom(cfg));
   return sharedLimiter;
 }
 
@@ -46,6 +60,7 @@ const paymentMethod = z.enum(["card", "paypal", "bank_transfer", "crypto"]);
 export function createServer(cfg: Config, deps: ServerDeps = {}): McpServer {
   const f = deps.fetch ?? fetch;
   const limiter = deps.limiter ?? getLimiter(cfg);
+  const ip = deps.clientKey ?? "anon";
   const server = new McpServer(
     { name: SERVER_NAME, version: SERVER_VERSION, title: "Global Shopaholics – US shopping & international shipping" },
     {
@@ -53,8 +68,6 @@ export function createServer(cfg: Config, deps: ServerDeps = {}): McpServer {
         "Global Shopaholics (GS) lets people anywhere buy from any US store and ship worldwide. Typical flow: get_shipping_rates or estimate_landed_cost → get_services_and_fees → get_started (free US address) or request_assisted_purchase (GS buys for them) / request_shipment_quote → track_shipment. Always present costs as GS's live rates or labelled estimates, never as guarantees. Only submit request_* tools after the user confirms their name, email and request details.",
     },
   );
-
-  const checkLimit = (tool: string) => limiter.check(`${deps.clientKey ?? "anon"}:${tool}`);
 
   server.registerTool(
     "get_shipping_rates",
@@ -71,8 +84,10 @@ export function createServer(cfg: Config, deps: ServerDeps = {}): McpServer {
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
     async (a) => {
+      const lim = await limiter.checkRate({ ip });
+      if (!lim.ok) return fail(rateLimitMessage(lim, GS_URLS.calculator), { retry_after_sec: lim.retryAfterSec, calculator: GS_URLS.calculator });
       try {
-        return json(await getShippingRates({ ...a, unit: a.unit ?? "kg" }, cfg, f));
+        return json(await getShippingRates({ ...a, unit: a.unit ?? "kg" }, cfg, f, deps.ratesCache));
       } catch (e) {
         const err = e as RatesError;
         return fail(err.message, { kind: err.kind, calculator: GS_URLS.calculator });
@@ -101,8 +116,10 @@ export function createServer(cfg: Config, deps: ServerDeps = {}): McpServer {
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
     async (a) => {
+      const lim = await limiter.checkRate({ ip });
+      if (!lim.ok) return fail(rateLimitMessage(lim, GS_URLS.calculator), { retry_after_sec: lim.retryAfterSec, calculator: GS_URLS.calculator });
       try {
-        return json(await estimateLandedCost({ ...a, assisted_purchase: a.assisted_purchase ?? "standard", payment_method: a.payment_method ?? "card", package: a.package ? { ...a.package, unit: a.package.unit ?? "kg" } : undefined }, cfg, f));
+        return json(await estimateLandedCost({ ...a, assisted_purchase: a.assisted_purchase ?? "standard", payment_method: a.payment_method ?? "card", package: a.package ? { ...a.package, unit: a.package.unit ?? "kg" } : undefined }, cfg, f, deps.ratesCache));
       } catch (e: any) {
         return fail(e?.message ?? String(e));
       }
@@ -164,7 +181,7 @@ export function createServer(cfg: Config, deps: ServerDeps = {}): McpServer {
       description:
         "Sends an Assisted Purchase request to the Global Shopaholics team: GS checks price/availability, confirms the total with the customer by email, buys from the US store, and ships it. Nothing is charged by this tool. Only call after the user has confirmed product link(s), quantity, destination, name and email. Returns a reference id and next steps.",
       inputSchema: {
-        product_urls: z.array(z.string().url()).min(1).max(20).describe("Product page URL(s) at US stores."),
+        product_urls: z.array(z.string().min(8).max(2000)).min(1).max(20).describe("Product page URL(s) at US stores (http or https)."),
         quantity: z.number().int().min(1).max(999).default(1),
         variant: z.string().max(300).optional().describe("Size/color/model details."),
         budget_usd: z.number().positive().optional().describe("Max the customer wants to spend on items."),
@@ -177,19 +194,32 @@ export function createServer(cfg: Config, deps: ServerDeps = {}): McpServer {
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     },
     async (a) => {
-      const lim = checkLimit("request_assisted_purchase");
-      if (!lim.ok) return fail(`Rate limit reached. Try again in ${lim.retryAfterSec}s or use ${GS_URLS.assistedPurchase}.`);
+      const name = validateName(a.name);
+      if (isFieldError(name)) return fail(name.error);
+      const email = validateEmail(a.email);
+      if (isFieldError(email)) return fail(email.error);
+      const phone = validatePhone(a.phone);
+      if (isFieldError(phone)) return fail(phone.error);
+      const dest = validateCountry(a.destination_country);
+      if (isFieldError(dest)) return fail(dest.error);
+      const urls = validateHttpUrls(a.product_urls, 20);
+      if (isFieldError(urls)) return fail(urls.error);
+      const city = cleanText(a.destination_city, 80);
+      const variant = cleanText(a.variant, 300);
+      const notes = cleanText(a.notes, 1000);
+      const lim = await limiter.checkLead({ ip, email });
+      if (!lim.ok) return fail(leadLimitMessage(lim, GS_URLS.assistedPurchase, GS_CONTACT.email), { retry_after_sec: lim.retryAfterSec, request_page: GS_URLS.assistedPurchase, email: GS_CONTACT.email });
       const summary = [
         "Assisted Purchase request via AI agent (MCP)",
-        `Name: ${a.name} | Email: ${a.email}${a.phone ? ` | Phone: ${a.phone}` : ""}`,
-        `Ship to: ${a.destination_city ? a.destination_city + ", " : ""}${a.destination_country}`,
-        `Products (qty ${a.quantity ?? 1}): ${a.product_urls.join(" , ")}`,
-        a.variant ? `Variant: ${a.variant}` : "",
+        `Name: ${name} | Email: ${email}${phone ? ` | Phone: ${phone}` : ""}`,
+        `Ship to: ${city ? city + ", " : ""}${dest.name} (${dest.code})`,
+        `Products (qty ${a.quantity ?? 1}): ${urls.join(" , ")}`,
+        variant ? `Variant: ${variant}` : "",
         a.budget_usd ? `Budget: $${a.budget_usd}` : "",
         a.payment_method ? `Payment: ${a.payment_method}` : "",
-        a.notes ? `Notes: ${a.notes}` : "",
+        notes ? `Notes: ${notes}` : "",
       ].filter(Boolean).join("\n");
-      const r = await submitLead({ kind: "assisted_purchase", name: a.name, email: a.email, phone: a.phone, destination_country: a.destination_country, destination_city: a.destination_city, details: a, summary }, cfg, f);
+      const r = await submitLead({ kind: "assisted_purchase", name, email, phone, destination_country: dest.code, destination_city: city, details: { ...a, product_urls: urls, variant, notes, destination_country: dest.code, destination_city: city }, summary }, cfg, f);
       return json({
         ...r,
         next_steps: [
@@ -221,19 +251,31 @@ export function createServer(cfg: Config, deps: ServerDeps = {}): McpServer {
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     },
     async (a) => {
-      const lim = checkLimit("request_shipment_quote");
-      if (!lim.ok) return fail(`Rate limit reached. Try again in ${lim.retryAfterSec}s or email ${GS_CONTACT.email}.`);
+      const name = validateName(a.name);
+      if (isFieldError(name)) return fail(name.error);
+      const email = validateEmail(a.email);
+      if (isFieldError(email)) return fail(email.error);
+      const phone = validatePhone(a.phone);
+      if (isFieldError(phone)) return fail(phone.error);
+      const dest = validateCountry(a.destination_country);
+      if (isFieldError(dest)) return fail(dest.error);
+      const city = cleanText(a.destination_city, 80);
+      const contents = cleanText(a.contents, 500);
+      if (!contents || contents.length < 2) return fail("Contents must be 2–500 characters.");
+      const notes = cleanText(a.notes, 1000);
+      const lim = await limiter.checkLead({ ip, email });
+      if (!lim.ok) return fail(leadLimitMessage(lim, GS_URLS.assistedPurchase, GS_CONTACT.email), { retry_after_sec: lim.retryAfterSec, request_page: GS_URLS.assistedPurchase, email: GS_CONTACT.email });
       const pk = (a.packages ?? []).map((p, i) => `#${i + 1}: ${p.weight}${p.unit ?? "kg"}${p.length ? ` ${p.length}x${p.width ?? "?"}x${p.height ?? "?"}` : ""}`).join("; ");
       const summary = [
         "Shipment request via AI agent (MCP)",
-        `Name: ${a.name} | Email: ${a.email}${a.phone ? ` | Phone: ${a.phone}` : ""}`,
-        `Ship to: ${a.destination_city ? a.destination_city + ", " : ""}${a.destination_country}`,
-        `Contents: ${a.contents}${a.declared_value_usd !== undefined ? ` | Declared value: $${a.declared_value_usd}` : ""}`,
+        `Name: ${name} | Email: ${email}${phone ? ` | Phone: ${phone}` : ""}`,
+        `Ship to: ${city ? city + ", " : ""}${dest.name} (${dest.code})`,
+        `Contents: ${contents}${a.declared_value_usd !== undefined ? ` | Declared value: $${a.declared_value_usd}` : ""}`,
         pk ? `Packages: ${pk}` : "",
         `Needs: ${(a.needs ?? ["quote"]).join(", ")}`,
-        a.notes ? `Notes: ${a.notes}` : "",
+        notes ? `Notes: ${notes}` : "",
       ].filter(Boolean).join("\n");
-      const r = await submitLead({ kind: "shipment_quote", name: a.name, email: a.email, phone: a.phone, destination_country: a.destination_country, destination_city: a.destination_city, details: a, summary }, cfg, f);
+      const r = await submitLead({ kind: "shipment_quote", name, email, phone, destination_country: dest.code, destination_city: city, details: { ...a, contents, notes, destination_country: dest.code, destination_city: city }, summary }, cfg, f);
       return json({
         ...r,
         next_steps: [

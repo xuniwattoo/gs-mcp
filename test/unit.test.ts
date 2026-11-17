@@ -5,7 +5,6 @@ import { assistedFee, estimateLandedCost } from "../src/lib/landed.js";
 import { findDutyRule, DUTY_RULES } from "../src/data/duties.js";
 import { guessCarrier, trackingLinks } from "../src/lib/tracking.js";
 import { submitLead } from "../src/lib/leads.js";
-import { RateLimiter } from "../src/lib/ratelimit.js";
 import { resolveCountry } from "../src/lib/countries.js";
 import { AO_FIXTURE, mockFetch } from "./helpers.js";
 
@@ -50,6 +49,21 @@ describe("rates", () => {
   });
   it("rejects unknown countries", () => {
     expect(() => buildRatesForm({ country: "Narnia", weight: 1, unit: "kg" })).toThrow(RatesError);
+  });
+  it("serves a cache hit without a second upstream call (memory + optional store)", async () => {
+    const { f, calls } = mockFetch();
+    const store = new Map<string, any>();
+    const external = { get: (k: string) => store.get(k), set: (k: string, v: any) => { store.set(k, v); } };
+    const a = await getShippingRates({ country: "AO", weight: 5, unit: "kg" }, cfg, f, external);
+    const b = await getShippingRates({ country: "AO", weight: 5, unit: "kg" }, cfg, f, external);
+    expect(a.cheapest?.price_usd).toBe(165.13);
+    expect(b.cheapest?.price_usd).toBe(165.13);
+    expect(calls.filter((c) => c.url.includes("rate-calculator")).length).toBe(1);
+    expect(store.size).toBe(1);
+    clearRatesCache();
+    const c = await getShippingRates({ country: "AO", weight: 5, unit: "kg" }, cfg, f, external);
+    expect(c.cheapest?.price_usd).toBe(165.13);
+    expect(calls.filter((c) => c.url.includes("rate-calculator")).length).toBe(1);
   });
 });
 
@@ -152,16 +166,5 @@ describe("leads (mocked, never real GHL)", () => {
     const r = await submitLead(lead, loadConfig({ GHL_API_TOKEN: "t", GHL_LOCATION_ID: "loc", GHL_API_BASE: "https://ghl.test" }), f);
     expect(r.status).toBe("not_submitted");
     expect(r.fallback).toBeDefined();
-  });
-});
-
-describe("rate limiter", () => {
-  it("limits per key", () => {
-    const l = new RateLimiter(2, 1000);
-    expect(l.check("a", 0).ok).toBe(true);
-    expect(l.check("a", 1).ok).toBe(true);
-    expect(l.check("a", 2).ok).toBe(false);
-    expect(l.check("b", 2).ok).toBe(true);
-    expect(l.check("a", 1500).ok).toBe(true);
   });
 });

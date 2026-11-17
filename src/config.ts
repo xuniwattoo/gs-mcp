@@ -22,6 +22,9 @@ export interface Config {
   assistedFeeMinUsd: number;
   assistedFeeWaivedMethods: string[];
   leadRateLimitPerHour: number;
+  leadEmailLimitPerDay: number;
+  leadDailyCap: number;
+  rateLimitPerHour: number;
   allowedOrigins: string[];
   publicBaseUrl?: string;
 }
@@ -55,6 +58,9 @@ export function loadConfig(env: EnvRecord = {}): Config {
     assistedFeeMinUsd: num(env.GS_ASSISTED_FEE_MIN_USD, 5),
     assistedFeeWaivedMethods: list(env.GS_ASSISTED_FEE_WAIVED_METHODS, ["bank_transfer", "crypto"]),
     leadRateLimitPerHour: num(env.LEAD_RATE_LIMIT_PER_HOUR, 5),
+    leadEmailLimitPerDay: num(env.LEAD_EMAIL_LIMIT_PER_DAY, 3),
+    leadDailyCap: num(env.LEAD_DAILY_CAP, 200),
+    rateLimitPerHour: num(env.RATE_LIMIT_PER_HOUR, 30),
     allowedOrigins: list(env.ALLOWED_ORIGINS, ["*"]),
     publicBaseUrl: str(env.PUBLIC_BASE_URL),
   };

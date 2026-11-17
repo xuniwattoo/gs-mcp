@@ -1,5 +1,6 @@
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { loadConfig, type Config, type EnvRecord } from "./config.js";
+import { canonicalizeClientIp } from "./lib/ip.js";
 import { createServer, SERVER_NAME, SERVER_VERSION, type ServerDeps } from "./server.js";
 
 function cors(cfg: Config, req: Request): Record<string, string> {
@@ -23,7 +24,8 @@ function withHeaders(res: Response, extra: Record<string, string>) {
 }
 
 export function clientKeyFrom(req: Request) {
-  return req.headers.get("cf-connecting-ip") ?? req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? req.headers.get("x-real-ip") ?? "unknown";
+  const raw = req.headers.get("cf-connecting-ip") ?? req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? req.headers.get("x-real-ip") ?? "unknown";
+  return canonicalizeClientIp(raw);
 }
 
 /**
@@ -39,7 +41,20 @@ export async function handleRequest(req: Request, env: EnvRecord = {}, deps: Ser
   if (url.pathname === "/" || url.pathname === "/health") {
     const mcpUrl = `${cfg.publicBaseUrl ?? url.origin}/mcp`;
     return Response.json(
-      { name: SERVER_NAME, version: SERVER_VERSION, status: "ok", mcp_endpoint: mcpUrl, transport: "streamable-http", docs: "https://globalshopaholics.com/" },
+      {
+        name: SERVER_NAME,
+        version: SERVER_VERSION,
+        status: "ok",
+        mcp_endpoint: mcpUrl,
+        transport: "streamable-http",
+        docs: "https://globalshopaholics.com/",
+        limiter: deps.limiterBackend ?? (deps.limiter ? "custom" : "memory"),
+        limiter_ok: deps.limiterStatus ? deps.limiterStatus.ok : undefined,
+        rate_limit_per_hour: cfg.rateLimitPerHour,
+        lead_rate_limit_per_hour: cfg.leadRateLimitPerHour,
+        lead_email_limit_per_day: cfg.leadEmailLimitPerDay,
+        lead_daily_cap: cfg.leadDailyCap,
+      },
       { headers: c },
     );
   }
