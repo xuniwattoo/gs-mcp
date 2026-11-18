@@ -3,6 +3,7 @@ import { loadConfig, type Config, type EnvRecord } from "./config.js";
 import { canonicalizeClientIp } from "./lib/ip.js";
 import { createServer, SERVER_NAME, SERVER_VERSION, type ServerDeps } from "./server.js";
 import { discoveryResponse } from "./discovery.js";
+import { imageResponse, landingResponse, selfOrigin, wantsHtml } from "./landing.js";
 
 function cors(cfg: Config, req: Request): Record<string, string> {
   const origin = req.headers.get("origin");
@@ -38,9 +39,18 @@ export async function handleRequest(req: Request, env: EnvRecord = {}, deps: Ser
   const url = new URL(req.url);
   const c = cors(cfg, req);
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: c });
+  // Public self URLs are always https (the request URL can arrive as http behind proxies).
+  const origin = (cfg.publicBaseUrl ?? selfOrigin(url)).replace(/\/+$/, "");
+  const isGet = req.method === "GET" || req.method === "HEAD";
+
+  if (isGet) {
+    const img = imageResponse(url.pathname, req.method);
+    if (img) return img;
+  }
+  if (isGet && url.pathname === "/" && wantsHtml(req, url)) return landingResponse(origin, req.method);
 
   if (url.pathname === "/" || url.pathname === "/health") {
-    const mcpUrl = `${cfg.publicBaseUrl ?? url.origin}/mcp`;
+    const mcpUrl = `${origin}/mcp`;
     return Response.json(
       {
         name: SERVER_NAME,
@@ -49,8 +59,9 @@ export async function handleRequest(req: Request, env: EnvRecord = {}, deps: Ser
         mcp_endpoint: mcpUrl,
         transport: "streamable-http",
         docs: "https://globalshopaholics.com/mcp/",
-        server_card: `${cfg.publicBaseUrl ?? url.origin}/mcp/server-card`,
-        llms_txt: `${cfg.publicBaseUrl ?? url.origin}/llms.txt`,
+        server_card: `${origin}/mcp/server-card`,
+        llms_txt: `${origin}/llms.txt`,
+        homepage: `${origin}/`,
         limiter: deps.limiterBackend ?? (deps.limiter ? "custom" : "memory"),
         limiter_ok: deps.limiterStatus ? deps.limiterStatus.ok : undefined,
         rate_limit_per_hour: cfg.rateLimitPerHour,
@@ -58,11 +69,11 @@ export async function handleRequest(req: Request, env: EnvRecord = {}, deps: Ser
         lead_email_limit_per_day: cfg.leadEmailLimitPerDay,
         lead_daily_cap: cfg.leadDailyCap,
       },
-      { headers: c },
+      { headers: { ...c, vary: "Accept, User-Agent", "cache-control": "no-store" } },
     );
   }
   if (req.method === "GET" || req.method === "HEAD") {
-    const d = discoveryResponse(url.pathname, url.origin, env);
+    const d = discoveryResponse(url.pathname, origin, env);
     if (d) return d;
   }
   if (url.pathname !== "/mcp") return new Response("Not found", { status: 404, headers: c });

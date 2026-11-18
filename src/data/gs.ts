@@ -94,7 +94,7 @@ export const GS_PLANS: Plan[] = [
 ];
 
 export const GS_FEES: Fee[] = [
-  { item: "Assisted Purchase – standard request (published)", value: "0% bank transfer/crypto, otherwise 5% with a $5 minimum", source: GS_URLS.faqs },
+  { item: "Assisted Purchase – standard request (published)", value: "5% of order cost, $5 minimum", source: GS_URLS.faqs },
   { item: "Assisted Purchase – expedited request", value: "10% of order cost, $10 minimum", source: GS_URLS.assistedPurchase },
   { item: "Assisted Purchase – executive (special address, e.g. Sephora, ULTA, Coach)", value: "$10 special address + 10% of order cost", source: GS_URLS.assistedPurchase },
   { item: "Payment methods", value: "Credit/debit card, PayPal, bank wire transfer, Bitcoin. All methods up to $800 total; above $800 bank wire or Bitcoin", source: GS_URLS.faqs },
