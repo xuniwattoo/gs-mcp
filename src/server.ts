@@ -15,7 +15,7 @@ import type { RatesCacheStore } from "./lib/rates.js";
 import { cleanText, isFieldError, validateCountry, validateEmail, validateHttpUrls, validateName, validatePhone } from "./lib/validate.js";
 
 export const SERVER_NAME = "global-shopaholics";
-export const SERVER_VERSION = "1.0.0";
+export const SERVER_VERSION = "1.1.0";
 
 export interface ServerDeps {
   fetch?: typeof fetch;

@@ -1,6 +1,6 @@
 ---
 name: ship-from-us
-description: Use when the user wants to buy something from a US online store (Amazon, eBay, Walmart, Best Buy, brand sites) and get it delivered outside the US, asks how much shipping from the USA to their country costs, asks about customs duties or import taxes on a US order, needs a US shipping address or package forwarding, or wants someone to buy a US product for them. Uses the Global Shopaholics MCP tools.
+description: Use when the user wants to buy something from a US online store (Amazon, eBay, Walmart, Best Buy, brand sites) and get it delivered outside the US, asks how much shipping from the USA to their country costs, asks about customs duties or import taxes on a US order, needs a US shipping address or package forwarding, wants someone to buy a US product for them (abroad or inside the US), wants it found cheaper, or wants to pay with crypto or stablecoins. Uses the Global Shopaholics MCP tools.
 ---
 
 # Ship from the US with Global Shopaholics
@@ -16,6 +16,8 @@ Global Shopaholics (GS) is a US package forwarder and personal shopper with a wa
 | GS plans, fees, payment methods | `get_services_and_fees` |
 | A US address to shop stores that don't ship abroad | `get_started` |
 | GS to buy the item for them (store refuses foreign cards/addresses, or they prefer it) | `request_assisted_purchase` |
+| Someone inside the US wants GS to buy it for them, find it cheaper, or buy where stores won't ship to them (Hawaii, Alaska, Puerto Rico, APO/FPO, item limits, US card needed) | `request_us_purchase` (ship-to state + ZIP; `find_lower_price` to look for a better price) |
+| Pay GS a quoted total in crypto/stablecoins (0% fee) | `create_crypto_payment` (only after GS quoted the total); `get_crypto_payment_status` to check |
 | Heavy/oversize, freight, multiple boxes, customs paperwork | `request_shipment_quote` |
 | Where is my package | `track_shipment` |
 
@@ -30,5 +32,7 @@ Global Shopaholics (GS) is a US package forwarder and personal shopper with a wa
 
 - Present GS shipping prices as live rates and duty/tax figures as estimates, never guarantees.
 - No payment happens in chat. GS emails the customer a confirmation and invoice before buying. Assisted Purchase fee: 0% when paid by bank transfer or crypto, otherwise 5% with a $5 minimum.
+- US domestic orders: GS buys and ships straight to the US address (no warehouse forwarding). It looks for a lower price via other stores, coupons, price matching and outlets, but never promises savings.
+- Crypto: only call `create_crypto_payment` after GS has quoted a total or the customer agreed an amount with GS. Max $10,000. The customer pays at the returned link, not in chat.
 - Legal items only. Carriers restrict batteries, liquids, weapons and similar; GS confirms what can ship.
 - Never submit `request_*` tools without the user's explicit confirmation of their details.

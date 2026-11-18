@@ -1,6 +1,6 @@
 {
   "name": "gs-mcp",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Global Shopaholics MCP server: US shipping rates, landed-cost estimates, assisted purchase and shipment requests for AI agents.",
   "type": "module",
   "license": "MIT",

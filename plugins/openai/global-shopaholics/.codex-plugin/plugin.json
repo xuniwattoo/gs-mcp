@@ -1,7 +1,7 @@
 {
   "name": "global-shopaholics",
-  "version": "1.0.0",
-  "description": "Buy from any US store and ship worldwide: live shipping rates, landed cost with customs duties, assisted purchase, tracking.",
+  "version": "1.1.0",
+  "description": "Buy from any US store for you: ship worldwide or in the US, find it cheaper, pay in crypto. Live shipping rates, landed cost, US buy-for-me, crypto checkout, tracking.",
   "author": {
     "name": "Global Shopaholics",
     "email": "help@globalshopaholics.com",
@@ -43,6 +43,8 @@
             { "description": "Landed cost with duties", "prompt": "I want to buy a $250 pair of headphones in the US and ship them to the UK. What is the total including VAT?", "tools_triggered": "estimate_landed_cost", "expected_behavior": "Returns item + GS fee + shipping + estimated UK VAT/duty as a labelled estimate range." },
             { "description": "Fees and payment", "prompt": "What does Global Shopaholics charge to buy something for me, and how can I pay?", "tools_triggered": "get_services_and_fees", "expected_behavior": "Explains the Assisted Purchase fee (0% bank transfer/crypto, otherwise 5% with a $5 minimum) and payment methods with source links." },
             { "description": "Get a US address", "prompt": "I need a US address to shop on Amazon from Pakistan.", "tools_triggered": "get_started", "expected_behavior": "Gives sign-up steps for the free GS US address and how forwarding works." },
+            { "description": "US buy-for-me", "prompt": "I live in Hawaii and this store will not ship to me. Can you buy it and find it cheaper?", "tools_triggered": "request_us_purchase", "expected_behavior": "Collects links, ship-to state/ZIP, name and email, confirms, then submits; promises no prices." },
+            { "description": "Pay in crypto", "prompt": "GS quoted me $120. I want to pay with USDC.", "tools_triggered": "create_crypto_payment", "expected_behavior": "Creates a BTCPay checkout link after confirming amount and email; notes 0% crypto fee." },
             { "description": "Track a package", "prompt": "Track my DHL package 1234567890.", "tools_triggered": "track_shipment", "expected_behavior": "Returns the official DHL tracking link." }
           ],
           "negative": [
@@ -52,7 +54,7 @@
           ]
         },
         "commerce": false,
-        "commerce_description": "The plugin quotes shipping and sends purchase requests to the Global Shopaholics team. It does not process payments; GS invoices customers by email after confirming the order."
+        "commerce_description": "The plugin quotes shipping and sends purchase requests to the Global Shopaholics team. It does not take payment in chat; crypto payments happen on GS's BTCPay checkout page; GS invoices customers by email after confirming the order."
       },
       "publication": {
         "release_notes": "Initial release: live shipping rates, landed cost with duties, services and fees, US address sign-up, assisted purchase and shipment requests, tracking links."

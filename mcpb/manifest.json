@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "global-shopaholics",
   "display_name": "Global Shopaholics",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Buy from any US store for you: ship worldwide or in the US, find it cheaper, pay in crypto.",
   "long_description": "Connects Claude to the free public Global Shopaholics MCP server (https://mcp.globalshopaholics.com/mcp). Get live DHL, FedEx, UPS and USPS rates from the GS US warehouse to any country, estimate total landed cost including customs duties and import taxes, get a free US shipping address, and ask Global Shopaholics to buy an item from any US store for you. GS confirms every order and its total by email before buying; nothing is charged in chat. Legal items only.",
   "author": {
