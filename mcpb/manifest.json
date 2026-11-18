@@ -30,6 +30,8 @@
     { "name": "get_started", "description": "Get a free US shipping address for package forwarding." },
     { "name": "request_assisted_purchase", "description": "Ask GS to buy from any US store for you (confirmed by email; nothing charged in chat)." },
     { "name": "request_shipment_quote", "description": "Custom quote for heavy/oversize, freight or customs paperwork." },
+    { "name": "create_crypto_payment", "description": "Crypto checkout link for an amount GS has quoted (0% fee)." },
+    { "name": "get_crypto_payment_status", "description": "Status of a crypto invoice." },
     { "name": "track_shipment", "description": "Carrier tracking link for DHL, FedEx, UPS or USPS." }
   ],
   "tools_generated": false,

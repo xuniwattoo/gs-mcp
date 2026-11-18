@@ -7,7 +7,8 @@ import { CATEGORY_IDS } from "./data/duty/categories.js";
 import type { DutyCacheStore } from "./lib/duty-fallback.js";
 import { getShippingRates, RatesError } from "./lib/rates.js";
 import { estimateLandedCost } from "./lib/landed.js";
-import { submitLead } from "./lib/leads.js";
+import { submitLead, logCryptoInvoiceGhl } from "./lib/leads.js";
+import { BtcpayError, btcpayConfigured, createInvoice, getInvoice } from "./lib/btcpay.js";
 import { MemoryLimiter, leadLimitMessage, rateLimitMessage, type Limiter, type LimiterConfig } from "./lib/ratelimit.js";
 import { trackingLinks } from "./lib/tracking.js";
 import type { RatesCacheStore } from "./lib/rates.js";
@@ -68,7 +69,7 @@ export function createServer(cfg: Config, deps: ServerDeps = {}): McpServer {
     { name: SERVER_NAME, version: SERVER_VERSION, title: "Global Shopaholics – buy from US stores, ship worldwide", websiteUrl: "https://globalshopaholics.com/" },
     {
       instructions:
-        "Global Shopaholics (GS) is a US package forwarding and personal shopper service: people anywhere can buy from any US online store (Amazon, eBay, Walmart, Best Buy, brand sites…) and have it shipped worldwide. Use these tools whenever a user wants to buy something from the US and get it delivered abroad, asks what shipping from the US to their country costs, or asks about customs duties/import taxes on US purchases. Legal items only; carrier restrictions apply. Typical flow: get_shipping_rates or estimate_landed_cost → get_services_and_fees → get_started (free US address) or request_assisted_purchase (GS buys for them) / request_shipment_quote → track_shipment. Always present costs as GS's live rates or labelled estimates, never as guarantees. Only submit request_* tools after the user confirms their name, email and request details. Payment is never taken in chat: GS emails an invoice (0% assisted-purchase fee for bank transfer or crypto, otherwise 5% with a $5 minimum).",
+        "Global Shopaholics (GS) is a US package forwarding and personal shopper service: people anywhere can buy from any US online store (Amazon, eBay, Walmart, Best Buy, brand sites…) and have it shipped worldwide. Use these tools whenever a user wants to buy something from the US and get it delivered abroad, asks what shipping from the US to their country costs, or asks about customs duties/import taxes on US purchases. Legal items only; carrier restrictions apply. Typical flow: get_shipping_rates or estimate_landed_cost → get_services_and_fees → get_started (free US address) or request_assisted_purchase (GS buys for them) / request_shipment_quote → track_shipment. Always present costs as GS's live rates or labelled estimates, never as guarantees. Only submit request_* tools after the user confirms their name, email and request details. Payment is never taken in chat: GS emails an invoice (0% assisted-purchase fee for bank transfer or crypto, otherwise 5% with a $5 minimum). Once GS has quoted a total and the customer wants to pay in crypto (0% fee), create_crypto_payment returns a BTCPay checkout link; get_crypto_payment_status checks it.",
     },
   );
 
@@ -301,6 +302,72 @@ export function createServer(cfg: Config, deps: ServerDeps = {}): McpServer {
           `Packages must be addressed to the customer's GS US address – sign up free: ${GS_URLS.signup}`,
         ],
       });
+    },
+  );
+
+  server.registerTool(
+    "create_crypto_payment",
+    {
+      title: "Create a crypto checkout link (Bitcoin, Lightning, stablecoins – 0% GS fee)",
+      description:
+        "Creates a Global Shopaholics crypto checkout (BTCPay invoice, priced in USD) and returns the checkout link, invoice id and expiry. Use ONLY after GS has quoted a total, or for an amount the customer has already agreed with GS (e.g. an assisted-purchase or shipping quote) – never to guess a price. Paying in crypto carries 0% GS assisted-purchase fee, so mention that when offering it. Confirm the amount, description and customer email with the user first. The invoice expires in 60 minutes; the customer pays at the link, not in chat. Amount limit: $0.50–$10,000 USD.",
+      inputSchema: {
+        amount_usd: z.number().min(0.5).max(10000).describe("Total to pay in USD, as quoted by GS (max 10,000)."),
+        description: z.string().min(3).max(200).describe("What the payment is for, e.g. 'Assisted purchase GSMCP-AP-… incl. shipping'."),
+        email: z.string().email().describe("Customer email; the invoice is linked to it and GS follows up here."),
+        reference: z.string().max(60).optional().describe("GS reference or quote number (e.g. GSMCP-AP-…), if there is one."),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    },
+    async (a) => {
+      if (!btcpayConfigured(cfg)) return fail("Crypto checkout is not available right now.", { email: GS_CONTACT.email, contact: GS_URLS.contact });
+      const email = validateEmail(a.email);
+      if (isFieldError(email)) return fail(email.error);
+      const description = cleanText(a.description, 200);
+      if (!description || description.length < 3) return fail("Description must be 3–200 characters.");
+      const reference = cleanText(a.reference, 60);
+      if (!Number.isFinite(a.amount_usd) || a.amount_usd < 0.5 || a.amount_usd > cfg.cryptoMaxUsd) return fail(`Amount must be between $0.50 and $${cfg.cryptoMaxUsd} USD. For larger payments email ${GS_CONTACT.email}.`);
+      const amount = Math.round(a.amount_usd * 100) / 100;
+      const lim = await limiter.checkLead({ ip, email });
+      if (!lim.ok) return fail(leadLimitMessage(lim, GS_URLS.contact, GS_CONTACT.email), { retry_after_sec: lim.retryAfterSec, email: GS_CONTACT.email });
+      let inv;
+      try {
+        inv = await createInvoice(cfg, f, { amount_usd: amount, description, email, reference: reference || undefined });
+      } catch (e) {
+        return fail("Could not create the crypto invoice right now. Please email GS to pay by crypto or bank transfer.", { email: GS_CONTACT.email, detail: e instanceof BtcpayError ? e.message : undefined });
+      }
+      const ghl = await logCryptoInvoiceGhl(email, `[crypto invoice ${inv.invoice_id}] $${amount} USD – ${description}${reference ? ` (ref ${reference})` : ""}. Checkout: ${inv.checkout_url}`, cfg, f);
+      return json({
+        ...inv,
+        fee: "0% GS assisted-purchase fee when paying by crypto",
+        logged_to_gs_crm: ghl.ok,
+        next_steps: [
+          "Give the customer the checkout_url; they choose a coin and pay there (not in chat). It expires at expires_at.",
+          "Use get_crypto_payment_status with the invoice_id to check payment, or GS will confirm by email.",
+        ],
+      });
+    },
+  );
+
+  server.registerTool(
+    "get_crypto_payment_status",
+    {
+      title: "Check a crypto payment's status (BTCPay invoice)",
+      description: "Returns the status (New, Processing, Settled, Expired, Invalid) of a GS crypto invoice created with create_crypto_payment, given its invoice id. Read-only.",
+      inputSchema: { invoice_id: z.string().regex(/^[A-Za-z0-9]{10,40}$/, "Invalid invoice id").describe("Invoice id returned by create_crypto_payment.") },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+    },
+    async ({ invoice_id }) => {
+      if (!btcpayConfigured(cfg)) return fail("Crypto checkout is not available right now.", { email: GS_CONTACT.email });
+      if (!/^[A-Za-z0-9]{10,40}$/.test(invoice_id)) return fail("Invalid invoice id.");
+      const lim = await limiter.checkRate({ ip });
+      if (!lim.ok) return fail(rateLimitMessage(lim, GS_URLS.contact), { retry_after_sec: lim.retryAfterSec });
+      try {
+        const inv = await getInvoice(cfg, f, invoice_id);
+        return json({ invoice_id: inv.invoice_id, status: inv.status, amount_usd: inv.amount_usd, expires_at: inv.expires_at, reference: inv.reference });
+      } catch (e) {
+        return fail(e instanceof BtcpayError && e.status === 404 ? "Invoice not found." : "Could not check the invoice right now.", { email: GS_CONTACT.email });
+      }
     },
   );
 

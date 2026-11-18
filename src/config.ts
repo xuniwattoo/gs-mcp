@@ -16,6 +16,10 @@ export interface Config {
   ghlApiBase: string;
   leadWebhookUrl?: string;
   leadWebhookSecret?: string;
+  btcpayUrl?: string;
+  btcpayApiKey?: string;
+  btcpayStoreId?: string;
+  cryptoMaxUsd: number;
   easyshipApiKey?: string;
   easyshipTaxUrl: string;
   assistedFeePct: number;
@@ -50,6 +54,10 @@ export function loadConfig(env: EnvRecord = {}): Config {
     ghlApiBase: str(env.GHL_API_BASE) ?? "https://services.leadconnectorhq.com",
     leadWebhookUrl: str(env.LEAD_WEBHOOK_URL),
     leadWebhookSecret: str(env.LEAD_WEBHOOK_SECRET),
+    btcpayUrl: str(env.BTCPAY_URL)?.replace(/\/+$/, ""),
+    btcpayApiKey: str(env.BTCPAY_API_KEY),
+    btcpayStoreId: str(env.BTCPAY_STORE_ID),
+    cryptoMaxUsd: num(env.CRYPTO_MAX_USD, 10000),
     easyshipApiKey: str(env.EASYSHIP_API_KEY),
     easyshipTaxUrl: str(env.EASYSHIP_TAX_URL) ?? "https://public-api.easyship.com/2024-09/taxes_and_duties",
     // Owner-confirmed policy (Nov 2026): 0% when paying by bank transfer or crypto, otherwise 5%

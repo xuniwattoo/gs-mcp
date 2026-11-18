@@ -55,7 +55,7 @@ describe("tool metadata for agent directories (ChatGPT/Claude)", () => {
   it("every tool has a title and explicit readOnly/destructive/openWorld hints", async () => {
     const res = await handleRequest(new Request("http://x/mcp", { method: "POST", headers: H, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }) }));
     const tools = ((await res.json()) as any).result.tools;
-    expect(tools.length).toBe(7);
+    expect(tools.length).toBe(9);
     for (const t of tools) {
       expect(t.title, t.name).toBeTruthy();
       expect(typeof t.annotations.readOnlyHint, t.name).toBe("boolean");
@@ -63,7 +63,7 @@ describe("tool metadata for agent directories (ChatGPT/Claude)", () => {
       expect(typeof t.annotations.openWorldHint, t.name).toBe("boolean");
     }
     const writes = tools.filter((t: any) => !t.annotations.readOnlyHint).map((t: any) => t.name).sort();
-    expect(writes).toEqual(["request_assisted_purchase", "request_shipment_quote"]);
+    expect(writes).toEqual(["create_crypto_payment", "request_assisted_purchase", "request_shipment_quote"]);
   });
   it("descriptions match common shopper queries", async () => {
     const res = await handleRequest(new Request("http://x/mcp", { method: "POST", headers: H, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }) }));

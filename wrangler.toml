@@ -20,6 +20,7 @@ GS_ASSISTED_FEE_WAIVED_METHODS = "bank_transfer,crypto"
 ALLOWED_ORIGINS = "*"
 GHL_LOCATION_ID = "cbpCVcgP2Eci9eEvs2Xc"
 
+# BTCPAY_URL, BTCPAY_STORE_ID, BTCPAY_API_KEY: crypto checkout (key = create+view invoices only).
 # EASYSHIP_API_KEY (optional): fallback duty/tax API for countries without a GS profile.
 # Secrets (set with `wrangler secret put NAME`, never commit):
 # GS_RATES_HEADER_NAME, GS_RATES_HEADER_VALUE, GHL_API_TOKEN,

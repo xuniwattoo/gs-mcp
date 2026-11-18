@@ -18,6 +18,8 @@ It only wraps what GS already has: the website's live rate engine, published fee
 | `get_started` | How to get the free US address (sign-up: `https://login.globalshopaholics.com/register`) and next steps. |
 | `request_assisted_purchase` | Sends a "buy it for me" request to GS (GoHighLevel and/or webhook), tag `mcp-assisted-purchase`; returns a reference id. Falls back to GS's [Assisted Purchase page](https://globalshopaholics.com/assisted-purchase/) + prefilled email if no sink is configured. |
 | `request_shipment_quote` | Same lead flow for manual quotes, labels, customs paperwork, freight; tag `mcp-shipping-request`. |
+| `create_crypto_payment` | **Crypto checkout is live.** Creates a BTCPay invoice (USD) for an amount GS has already quoted and returns checkout link, invoice id and expiry. 0% GS fee when paying by crypto. Capped at $10,000, rate limited, logged to the GHL contact (`mcp-crypto-payment`). Needs `BTCPAY_URL`, `BTCPAY_STORE_ID`, `BTCPAY_API_KEY` (key limited to create/view invoices). |
+| `get_crypto_payment_status` | Read-only status of an invoice by id. |
 | `track_shipment` | Carrier tracking URL (DHL/FedEx/UPS/USPS, auto-detected). GS has no public tracking page; customers also see status in their dashboard. |
 
 Resource: `gs://about` (markdown overview). Prompt: `buy-and-ship`.
@@ -124,7 +126,7 @@ See `.env.example` (Node/Vercel) or `wrangler.toml` `[vars]` + `wrangler secret 
 
 ```
 src/config.ts            env → typed config (works with Workers env or process.env)
-src/server.ts            McpServer: 7 tools, resource, prompt (zod schemas)
+src/server.ts            McpServer: 9 tools, resource, prompt (zod schemas)
 src/http.ts              stateless web-standard Streamable HTTP handler, CORS, /health
 src/entry/worker.ts      Cloudflare Workers entry
 src/entry/node.ts        plain Node HTTP entry (Cloudways/VPS)

@@ -107,3 +107,21 @@ export async function submitLead(lead: Lead, cfg: Config, f: typeof fetch = fetc
     summary: lead.summary,
   };
 }
+
+/** Best-effort: tag + note the contact in GHL when a crypto invoice is created. Never throws. */
+export async function logCryptoInvoiceGhl(email: string, note: string, cfg: Config, f: typeof fetch = fetch): Promise<{ ok: boolean; error?: string }> {
+  if (!cfg.ghlApiToken || !cfg.ghlLocationId) return { ok: false, error: "ghl not configured" };
+  const headers = { authorization: `Bearer ${cfg.ghlApiToken}`, version: "2021-07-28", "content-type": "application/json", accept: "application/json" };
+  try {
+    const up = await f(`${cfg.ghlApiBase}/contacts/upsert`, { method: "POST", headers, body: JSON.stringify({ locationId: cfg.ghlLocationId, email, source: "GS MCP connector" }) });
+    if (!up.ok) return { ok: false, error: `upsert HTTP ${up.status}` };
+    const data: any = await up.json();
+    const id: string | undefined = data?.contact?.id ?? data?.id;
+    if (!id) return { ok: false, error: "no contact id" };
+    await f(`${cfg.ghlApiBase}/contacts/${id}/tags`, { method: "POST", headers, body: JSON.stringify({ tags: ["mcp-crypto-payment"] }) });
+    await f(`${cfg.ghlApiBase}/contacts/${id}/notes`, { method: "POST", headers, body: JSON.stringify({ body: note }) });
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, error: e?.message ?? String(e) };
+  }
+}

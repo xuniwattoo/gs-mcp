@@ -16,7 +16,7 @@ describe("MCP over web-standard Streamable HTTP", () => {
     const init = await rpc({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "t", version: "1" } } });
     expect(init.json.result.serverInfo.name).toBe("global-shopaholics");
     const tools = await rpc({ jsonrpc: "2.0", id: 2, method: "tools/list" });
-    expect(tools.json.result.tools.map((t: any) => t.name).sort()).toEqual(["estimate_landed_cost", "get_services_and_fees", "get_shipping_rates", "get_started", "request_assisted_purchase", "request_shipment_quote", "track_shipment"]);
+    expect(tools.json.result.tools.map((t: any) => t.name).sort()).toEqual(["create_crypto_payment", "estimate_landed_cost", "get_crypto_payment_status", "get_services_and_fees", "get_shipping_rates", "get_started", "request_assisted_purchase", "request_shipment_quote", "track_shipment"]);
     const res = await rpc({ jsonrpc: "2.0", id: 3, method: "resources/list" });
     expect(res.json.result.resources[0].uri).toBe("gs://about");
     const pr = await rpc({ jsonrpc: "2.0", id: 4, method: "prompts/list" });
@@ -74,5 +74,55 @@ describe("MCP over web-standard Streamable HTTP", () => {
     expect((await handleRequest(new Request("http://x/health"))).status).toBe(200);
     expect((await handleRequest(new Request("http://x/mcp", { method: "OPTIONS", headers: { origin: "https://claude.ai" } }))).headers.get("access-control-allow-origin")).toBe("*");
     expect((await handleRequest(new Request("http://x/mcp"))).status).toBe(405);
+  });
+});
+
+describe("crypto checkout", () => {
+  const env = { BTCPAY_URL: "https://pay.test", BTCPAY_STORE_ID: "store1", BTCPAY_API_KEY: "secretkey123" };
+  const call = (name: string, args: any, deps: any, e: any = env) => rpc({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: args } }, deps, e);
+  function btcFetch() {
+    const calls: { url: string; init?: RequestInit }[] = [];
+    const f = (async (input: any, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.url;
+      calls.push({ url, init });
+      if (url.startsWith("https://pay.test") && init?.method === "POST") return Response.json({ id: "ABCDEFGHIJKLmn", checkoutLink: "https://pay.test/i/ABCDEFGHIJKLmn", status: "New", amount: "25.00", expirationTime: 1900000000, metadata: { orderId: "REF1" } });
+      if (url.startsWith("https://pay.test")) return url.includes("MISSINGMISSING") ? new Response("", { status: 404 }) : Response.json({ id: "ABCDEFGHIJKLmn", checkoutLink: "x", status: "Settled", amount: "25.00", expirationTime: 1900000000 });
+      throw new Error(`unexpected ${url}`);
+    }) as typeof fetch;
+    return { f, calls };
+  }
+  const good = { amount_usd: 25, description: "Assisted purchase quote", email: "t@example.com", reference: "REF1" };
+  it("creates an invoice with metadata and never leaks the key", async () => {
+    const { f, calls } = btcFetch();
+    const r = await call("create_crypto_payment", good, { fetch: f, limiter: new MemoryLimiter(defaultLimiterConfig()), clientKey: "c1" });
+    const out = JSON.parse(r.json.result.content[0].text);
+    expect(out.invoice_id).toBe("ABCDEFGHIJKLmn");
+    expect(out.checkout_url).toContain("/i/");
+    expect(out.expires_at).toMatch(/^20/);
+    expect(JSON.stringify(r.json)).not.toContain("secretkey123");
+    const body = JSON.parse(calls[0].init!.body as string);
+    expect(body).toMatchObject({ amount: "25.00", currency: "USD", metadata: { orderId: "REF1", buyerEmail: "t@example.com", source: "gs-mcp" } });
+    expect((calls[0].init!.headers as any).authorization).toBe("token secretkey123");
+  });
+  it("rejects over-cap, bad email and unconfigured", async () => {
+    const { f, calls } = btcFetch();
+    const d = { fetch: f, limiter: new MemoryLimiter(defaultLimiterConfig()), clientKey: "c2" };
+    expect((await call("create_crypto_payment", { ...good, amount_usd: 10001 }, d)).json.result.isError).toBe(true);
+    expect((await call("create_crypto_payment", { ...good, email: "nope" }, d)).json.result.isError).toBe(true);
+    expect((await call("create_crypto_payment", good, d, {})).json.result.isError).toBe(true);
+    expect(calls.length).toBe(0);
+  });
+  it("rate limits invoice creation", async () => {
+    const { f } = btcFetch();
+    const d = { fetch: f, limiter: new MemoryLimiter(defaultLimiterConfig({ leadPerIpPerHour: 1 })), clientKey: "c3" };
+    expect((await call("create_crypto_payment", good, d)).json.result.isError).toBeUndefined();
+    expect((await call("create_crypto_payment", good, d)).json.result.isError).toBe(true);
+  });
+  it("reports status and validates the invoice id", async () => {
+    const { f } = btcFetch();
+    const d = { fetch: f, limiter: new MemoryLimiter(defaultLimiterConfig()), clientKey: "c4" };
+    const ok = await call("get_crypto_payment_status", { invoice_id: "ABCDEFGHIJKLmn" }, d);
+    expect(JSON.parse(ok.json.result.content[0].text).status).toBe("Settled");
+    expect((await call("get_crypto_payment_status", { invoice_id: "../x" }, d)).json.result.isError).toBe(true);
   });
 });
