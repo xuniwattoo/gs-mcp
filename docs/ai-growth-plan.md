@@ -105,6 +105,6 @@ Repo, with install for Claude Code (`/plugin marketplace add xuniwattoo/gs-mcp`)
 1/ Your AI agent can now buy from any US store and ship it to you, wherever you live. 🧵
 2/ We just opened the Global Shopaholics MCP server. It's free, with no sign-up: https://mcp.globalshopaholics.com/mcp
 3/ Ask Claude or ChatGPT: "How much to get this Amazon item to Lagos, duties included?" You get live DHL/FedEx/UPS/USPS prices plus an estimate of customs duties.
-4/ Then say "buy it for me." A GS shopper confirms by email, buys it from the US store, and ships it. The fee is 0% if you pay by bank transfer or crypto.
+4/ Then say "buy it for me." A GS shopper confirms by email, buys it from the US store, and ships it. The fee is 0% if you pay by bank transfer or crypto, otherwise 5% with a $5 minimum.
 5/ Setup takes one line. Claude Code: /plugin marketplace add xuniwattoo/gs-mcp. Cursor, VS Code, Codex, Gemini: https://github.com/xuniwattoo/gs-mcp
 6/ Legal items only. Built on @Cloudflare Workers and open source (MIT). Tell us what your agent should do next.

@@ -23,6 +23,12 @@ Add this to `cline_mcp_settings.json` (Cline → MCP Servers → Configure → "
 }
 ```
 
+**Cline CLI** (3.x) can add it in one command:
+
+```bash
+cline mcp add global-shopaholics https://mcp.globalshopaholics.com/mcp --transport streamableHttp --yes
+```
+
 If the client only supports stdio, use the `mcp-remote` bridge instead:
 
 ```json
@@ -42,4 +48,4 @@ Call `get_shipping_rates` with `{"country": "NG", "weight": 5, "unit": "kg"}`. Y
 
 ## Tools
 
-`get_shipping_rates`, `estimate_landed_cost`, `get_services_and_fees`, `get_started`, `request_assisted_purchase`, `request_shipment_quote`, `track_shipment`. The two `request_*` tools send a request to the Global Shopaholics team, who confirm by email before anything is bought. Nothing is charged in chat.
+`get_shipping_rates`, `estimate_landed_cost`, `get_services_and_fees`, `get_started`, `request_assisted_purchase`, `request_shipment_quote`, `track_shipment`. The two `request_*` tools send a request to the Global Shopaholics team, who confirm by email before anything is bought. Nothing is charged in chat. Assisted Purchase fee: 0% bank transfer/crypto, otherwise 5% with a $5 minimum.
