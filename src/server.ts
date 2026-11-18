@@ -376,7 +376,7 @@ export function createServer(cfg: Config, deps: ServerDeps = {}): McpServer {
     {
       title: "Find it cheaper at US stores (compare US prices, save money)",
       description:
-        "Searches Google Shopping (US) for a product and returns the cheapest US offers: store, price, link, rating and the savings versus the user's current price. Use when someone asks 'find this cheaper', 'best price for…', 'is there a better deal' or 'where can I buy this in the US'. Pass a product name (brand + model is best) or a product URL, plus the current price if known. Prices are indicative only – they can change, exclude tax/shipping and may differ at checkout – so never promise them. Links are plain store/Google links, not affiliate links. GS can buy the cheapest legitimate option for the customer and ship it anywhere in the US or worldwide: submit it with request_us_purchase (US delivery) or request_assisted_purchase (international), and GS confirms the total by email first. Fees: 0% when paying by crypto or bank transfer, otherwise 5% with a $5 minimum; crypto checkout is available via create_crypto_payment once GS quotes a total. Limited to a few searches per hour per client.",
+        "Searches Google Shopping (US) for a product and returns the cheapest US offers: store, price, link, rating and the savings versus the user's current price. Use when someone asks 'find this cheaper', 'best price for…', 'is there a better deal' or 'where can I buy this in the US'. Pass a product name (brand + model is best) or a product URL, plus the current price if known. Prices are indicative only – they can change, exclude tax/shipping and may differ at checkout – so never promise them. Links go straight to the retailer's product page where found (direct_link=true), otherwise to a Google Shopping link; they are never affiliate links. GS can buy the cheapest legitimate option for the customer and ship it anywhere in the US or worldwide: submit it with request_us_purchase (US delivery) or request_assisted_purchase (international), and GS confirms the total by email first. Fees: 0% when paying by crypto or bank transfer, otherwise 5% with a $5 minimum; crypto checkout is available via create_crypto_payment once GS quotes a total. Limited to a few searches per hour per client.",
       inputSchema: {
         product: z.string().min(3).max(500).describe("Product name (brand + model) or a product page URL."),
         current_price_usd: z.number().positive().max(1000000).optional().describe("What the customer would pay now, to compute savings."),
@@ -399,6 +399,7 @@ export function createServer(cfg: Config, deps: ServerDeps = {}): McpServer {
           raw_results: r.raw_results,
           offers: fresh,
           resale_or_used_offers: resale,
+          retailer_pages: r.retailer_pages,
           cheapest: { store: best.store, price_usd: best.price_usd, savings_usd: best.savings_usd },
           disclaimer: "Indicative prices from Google Shopping (US); may change and exclude tax/shipping. No affiliate links. offers[] are new/unspecified-condition listings; resale_or_used_offers[] come from resale marketplaces or used/refurbished listings. Verify condition and seller before relying on any.",
           next_steps: [

@@ -20,7 +20,7 @@ const serper = { shopping: [
 ] };
 function mk(status = 200) {
   const calls: { url: string; init?: RequestInit }[] = [];
-  const f = (async (u: any, init?: RequestInit) => { calls.push({ url: String(u), init }); return status === 200 ? Response.json(serper) : new Response("x", { status }); }) as typeof fetch;
+  const f = (async (u: any, init?: RequestInit) => { calls.push({ url: String(u), init }); return status === 200 ? Response.json(String(u).endsWith("/search") ? { organic: [{ title: "AirPods Pro 2 | Best Buy", link: "https://www.bestbuy.com/product/apple-airpods-pro-2/JJGCQ88C8X" }, { title: "review", link: "https://www.techradar.com/reviews/x" }] } : serper) : new Response("x", { status }); }) as typeof fetch;
   return { f, calls };
 }
 beforeEach(() => clearPriceCache());
@@ -33,6 +33,9 @@ describe("find_lower_price", () => {
     expect(out.offers.map((o: any) => o.store)).toEqual(["Best Buy", "Amazon.com", "Walmart"]);
     expect(out.resale_or_used_offers.map((o: any) => o.store)).toEqual(["eBay", "Gizmo"]);
     expect(out.offers[0].savings_usd).toBeCloseTo(69.01);
+    expect(out.offers[0]).toMatchObject({ direct_link: true, link: "https://www.bestbuy.com/product/apple-airpods-pro-2/JJGCQ88C8X" });
+    expect(out.offers[1].direct_link).toBe(false);
+    expect(out.retailer_pages.length).toBe(1);
     expect(JSON.stringify(r)).not.toContain("serperSECRET");
     expect(calls[0].url).toBe("https://google.serper.dev/shopping");
     expect((calls[0].init!.headers as any)["X-API-KEY"]).toBe("serperSECRET");
@@ -43,7 +46,7 @@ describe("find_lower_price", () => {
     const d = { fetch: f, limiter: new MemoryLimiter(defaultLimiterConfig()), clientKey: "p2" };
     await call({ product: "AirPods  Pro 2" }, d);
     await call({ product: "airpods pro 2" }, d);
-    expect(calls.length).toBe(1);
+    expect(calls.length).toBe(3);
   });
   it("rate limits at 10/hour by default and handles missing key and upstream errors", async () => {
     const { f } = mk();
