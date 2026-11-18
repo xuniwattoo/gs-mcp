@@ -17,6 +17,7 @@ It only wraps what GS already has: the website's live rate engine, published fee
 | `get_services_and_fees` | Services, plans (Basic free, Premium $9.99, Business $14.99) and published fees with source URLs + last-checked date. |
 | `get_started` | How to get the free US address (sign-up: `https://login.globalshopaholics.com/register`) and next steps. |
 | `request_assisted_purchase` | Sends a "buy it for me" request to GS (GoHighLevel and/or webhook), tag `mcp-assisted-purchase`; returns a reference id. Falls back to GS's [Assisted Purchase page](https://globalshopaholics.com/assisted-purchase/) + prefilled email if no sink is configured. |
+| `request_us_purchase` | **US domestic buy-for-me.** GS buys from any US store and ships to a US address (incl. Hawaii, Alaska, Puerto Rico, APO/FPO, stores that won't ship to the customer). Inputs: product URLs, quantity, variant, max price, `find_lower_price`, ship-to state + ZIP, name, email. Same GHL lead flow; tags `mcp-us-domestic` (+ `price-beat`). Fee 0% for crypto/bank transfer, otherwise 5% with $5 minimum; crypto via `create_crypto_payment` once GS confirms the total. Prices are never guaranteed. |
 | `request_shipment_quote` | Same lead flow for manual quotes, labels, customs paperwork, freight; tag `mcp-shipping-request`. |
 | `create_crypto_payment` | **Crypto checkout is live.** Creates a BTCPay invoice (USD) for an amount GS has already quoted and returns checkout link, invoice id and expiry. 0% GS fee when paying by crypto. Capped at $10,000, rate limited, logged to the GHL contact (`mcp-crypto-payment`). Needs `BTCPAY_URL`, `BTCPAY_STORE_ID`, `BTCPAY_API_KEY` (key limited to create/view invoices). |
 | `get_crypto_payment_status` | Read-only status of an invoice by id. |
@@ -126,7 +127,7 @@ See `.env.example` (Node/Vercel) or `wrangler.toml` `[vars]` + `wrangler secret 
 
 ```
 src/config.ts            env → typed config (works with Workers env or process.env)
-src/server.ts            McpServer: 9 tools, resource, prompt (zod schemas)
+src/server.ts            McpServer: 10 tools, resource, prompt (zod schemas)
 src/http.ts              stateless web-standard Streamable HTTP handler, CORS, /health
 src/entry/worker.ts      Cloudflare Workers entry
 src/entry/node.ts        plain Node HTTP entry (Cloudways/VPS)

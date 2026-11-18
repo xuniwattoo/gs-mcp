@@ -16,7 +16,7 @@ describe("MCP over web-standard Streamable HTTP", () => {
     const init = await rpc({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "t", version: "1" } } });
     expect(init.json.result.serverInfo.name).toBe("global-shopaholics");
     const tools = await rpc({ jsonrpc: "2.0", id: 2, method: "tools/list" });
-    expect(tools.json.result.tools.map((t: any) => t.name).sort()).toEqual(["create_crypto_payment", "estimate_landed_cost", "get_crypto_payment_status", "get_services_and_fees", "get_shipping_rates", "get_started", "request_assisted_purchase", "request_shipment_quote", "track_shipment"]);
+    expect(tools.json.result.tools.map((t: any) => t.name).sort()).toEqual(["create_crypto_payment", "estimate_landed_cost", "get_crypto_payment_status", "get_services_and_fees", "get_shipping_rates", "get_started", "request_assisted_purchase", "request_shipment_quote", "request_us_purchase", "track_shipment"]);
     const res = await rpc({ jsonrpc: "2.0", id: 3, method: "resources/list" });
     expect(res.json.result.resources[0].uri).toBe("gs://about");
     const pr = await rpc({ jsonrpc: "2.0", id: 4, method: "prompts/list" });
@@ -124,5 +124,28 @@ describe("crypto checkout", () => {
     const ok = await call("get_crypto_payment_status", { invoice_id: "ABCDEFGHIJKLmn" }, d);
     expect(JSON.parse(ok.json.result.content[0].text).status).toBe("Settled");
     expect((await call("get_crypto_payment_status", { invoice_id: "../x" }, d)).json.result.isError).toBe(true);
+  });
+});
+
+describe("request_us_purchase", () => {
+  const args = { product_urls: ["https://www.amazon.com/dp/B000TEST"], quantity: 1, find_lower_price: true, ship_to_state: "hi", ship_to_zip: "96815", name: "MCP Test (ignore)", email: "t@example.com" };
+  const call = (a: any, deps: any) => rpc({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "request_us_purchase", arguments: a } }, deps, { GHL_API_TOKEN: "x", GHL_LOCATION_ID: "L", GHL_API_BASE: "https://ghl.test" });
+  it("tags mcp-us-domestic and price-beat in GHL", async () => {
+    const { f, calls } = mockFetch();
+    const r = await call(args, { fetch: f, limiter: new MemoryLimiter(defaultLimiterConfig()), clientKey: "u1" });
+    const out = JSON.parse(r.json.result.content[0].text);
+    expect(out.reference_id).toMatch(/^GSMCP-US-/);
+    expect(out.status).toBe("submitted");
+    const tagCall = calls.find((c) => c.url.endsWith("/tags"))!;
+    expect(JSON.parse(tagCall.init!.body as string).tags).toEqual(["mcp-us-domestic", "price-beat"]);
+    expect(calls.find((c) => c.url.endsWith("/notes"))!.init!.body as string).toContain("HI 96815");
+  });
+  it("omits price-beat when not requested and validates state/zip", async () => {
+    const { f, calls } = mockFetch();
+    const d = { fetch: f, limiter: new MemoryLimiter(defaultLimiterConfig()), clientKey: "u2" };
+    await call({ ...args, find_lower_price: false }, d);
+    expect(JSON.parse(calls.find((c) => c.url.endsWith("/tags"))!.init!.body as string).tags).toEqual(["mcp-us-domestic"]);
+    expect((await call({ ...args, ship_to_state: "ZZ" }, d)).json.result.isError).toBe(true);
+    expect((await call({ ...args, ship_to_zip: "abc" }, d)).json.result.isError).toBe(true);
   });
 });

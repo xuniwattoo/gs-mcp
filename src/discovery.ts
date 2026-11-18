@@ -4,7 +4,7 @@ import { SERVER_VERSION } from "./server.js";
 export const PUBLIC_MCP_URL = "https://mcp.globalshopaholics.com/mcp";
 export const REGISTRY_NAME = "io.github.xuniwattoo/gs-mcp";
 export const ICON_URL = "https://globalshopaholics.com/wp-content/uploads/2026/09/cropped-Favicon-192x192.png";
-export const SHORT_DESCRIPTION = "Buy from any US store and ship worldwide: shipping rates, landed cost, assisted purchase, tracking.";
+export const SHORT_DESCRIPTION = "Buy from any US store for you: ship worldwide or in the US, find it cheaper, pay in crypto.";
 
 export function serverCard(mcpUrl = PUBLIC_MCP_URL) {
   return {
@@ -44,7 +44,7 @@ export const LLMS_TXT = `# Global Shopaholics
 - Source and install guides: https://github.com/xuniwattoo/gs-mcp
 - Overview page: https://globalshopaholics.com/mcp/
 
-Use it when a user wants to buy something from a US store and get it delivered abroad, asks what shipping from the USA to their country costs, or asks about customs duties or import tax on a US order.
+Use it when a user wants to buy something from a US store and get it delivered abroad, wants GS to buy something for them inside the US ("buy this for me", "find this cheaper", Hawaii/Alaska/Puerto Rico/APO delivery, stores that won't ship to them), wants to pay with crypto or stablecoins, asks what shipping from the USA to their country costs, or asks about customs duties or import tax on a US order.
 
 Tools:
 - get_shipping_rates: live DHL/FedEx/UPS/USPS prices and transit times from the GS Delaware warehouse to any country.
@@ -52,6 +52,7 @@ Tools:
 - get_services_and_fees: plans and published fees.
 - get_started: how to get a free US shipping address.
 - request_assisted_purchase: ask GS to buy from a US store for the user (GS confirms the total by email; nothing is charged in chat).
+- request_us_purchase: US domestic buy-for-me: GS buys from any US store and ships to a US address (incl. HI, AK, PR, APO/FPO); optional lower-price search (other stores, coupons, price match, outlet; savings not guaranteed). Only ship-to state and ZIP needed; GS confirms the total by email.
 - request_shipment_quote: custom quotes for heavy/oversize items, freight or customs paperwork.
 - create_crypto_payment: crypto checkout (Bitcoin, Lightning, stablecoins) for an amount GS has quoted; 0% GS fee. Returns a checkout link.
 - get_crypto_payment_status: status of a crypto invoice by id.

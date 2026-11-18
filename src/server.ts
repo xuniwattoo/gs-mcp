@@ -59,6 +59,7 @@ const contactShape = {
   email: z.string().email().describe("Customer email; GS replies here."),
   phone: z.string().max(40).optional().describe("Optional phone/WhatsApp with country code."),
 };
+const US_STATES = new Set("AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY PR VI GU AS MP AA AE AP".split(" "));
 const paymentMethod = z.enum(["card", "paypal", "bank_transfer", "crypto"]);
 
 export function createServer(cfg: Config, deps: ServerDeps = {}): McpServer {
@@ -66,10 +67,10 @@ export function createServer(cfg: Config, deps: ServerDeps = {}): McpServer {
   const limiter = deps.limiter ?? getLimiter(cfg);
   const ip = deps.clientKey ?? "anon";
   const server = new McpServer(
-    { name: SERVER_NAME, version: SERVER_VERSION, title: "Global Shopaholics – buy from US stores, ship worldwide", websiteUrl: "https://globalshopaholics.com/" },
+    { name: SERVER_NAME, version: SERVER_VERSION, title: "Global Shopaholics – buy from any US store, ship worldwide or within the US, pay in crypto", websiteUrl: "https://globalshopaholics.com/" },
     {
       instructions:
-        "Global Shopaholics (GS) is a US package forwarding and personal shopper service: people anywhere can buy from any US online store (Amazon, eBay, Walmart, Best Buy, brand sites…) and have it shipped worldwide. Use these tools whenever a user wants to buy something from the US and get it delivered abroad, asks what shipping from the US to their country costs, or asks about customs duties/import taxes on US purchases. Legal items only; carrier restrictions apply. Typical flow: get_shipping_rates or estimate_landed_cost → get_services_and_fees → get_started (free US address) or request_assisted_purchase (GS buys for them) / request_shipment_quote → track_shipment. Always present costs as GS's live rates or labelled estimates, never as guarantees. Only submit request_* tools after the user confirms their name, email and request details. Payment is never taken in chat: GS emails an invoice (0% assisted-purchase fee for bank transfer or crypto, otherwise 5% with a $5 minimum). Once GS has quoted a total and the customer wants to pay in crypto (0% fee), create_crypto_payment returns a BTCPay checkout link; get_crypto_payment_status checks it.",
+        "Global Shopaholics (GS) is a US package forwarding and personal shopper service: people anywhere can buy from any US online store (Amazon, eBay, Walmart, Best Buy, brand sites…) and have it shipped worldwide. Use these tools whenever a user wants to buy something from the US and get it delivered abroad, wants something bought for them inside the US (request_us_purchase – incl. finding it cheaper, and Hawaii/Alaska/Puerto Rico/APO addresses), asks what shipping from the US to their country costs, or asks about customs duties/import taxes on US purchases. Legal items only; carrier restrictions apply. Typical flow: get_shipping_rates or estimate_landed_cost → get_services_and_fees → get_started (free US address) or request_assisted_purchase (GS buys for them) / request_shipment_quote → track_shipment. Always present costs as GS's live rates or labelled estimates, never as guarantees. Only submit request_* tools after the user confirms their name, email and request details. Payment is never taken in chat: GS emails an invoice (0% assisted-purchase fee for bank transfer or crypto, otherwise 5% with a $5 minimum). Once GS has quoted a total and the customer wants to pay in crypto (0% fee), create_crypto_payment returns a BTCPay checkout link; get_crypto_payment_status checks it.",
     },
   );
 
@@ -195,7 +196,7 @@ export function createServer(cfg: Config, deps: ServerDeps = {}): McpServer {
   server.registerTool(
     "request_assisted_purchase",
     {
-      title: "Buy from any US store for the user (assisted purchase / personal shopper)",
+      title: "Buy from any US store for the user, delivered abroad (assisted purchase / personal shopper)",
       description:
         "Buy-it-for-me: sends an Assisted Purchase request to the Global Shopaholics team, for when the user wants something from a US store (including stores that refuse foreign cards or addresses) shipped to them. GS checks price/availability, confirms the total with the customer by email, buys from the US store, and ships it. Nothing is charged by this tool and no payment happens in chat; GS emails an invoice. Legal items only. Only call after the user has confirmed product link(s), quantity, destination, name and email. Returns a reference id and next steps.",
       inputSchema: {
@@ -245,6 +246,68 @@ export function createServer(cfg: Config, deps: ServerDeps = {}): McpServer {
           "Customer pays the GS invoice (card/PayPal up to $800; bank wire or Bitcoin any amount).",
           "GS buys, receives the order at the Delaware warehouse, then the customer picks a courier and pays shipping.",
           `Customers without an account should sign up free: ${GS_URLS.signup}`,
+        ],
+      });
+    },
+  );
+
+  server.registerTool(
+    "request_us_purchase",
+    {
+      title: "Buy this for me in the US – find it cheaper, handle stores that won't ship to me (US delivery)",
+      description:
+        "US domestic buy-it-for-me. Global Shopaholics (GS) can buy from any US online store and ship it to a US address – not only abroad. Use when someone inside the US wants GS to buy an item for them, find it cheaper (other stores, coupons, price matching, outlet deals – prices are never guaranteed), or get an item from a store that won't ship to them: Hawaii, Alaska, Puerto Rico, Guam/USVI and APO/FPO/DPO military addresses, per-customer item limits, or stores that need a US card. Only the ship-to state and ZIP are needed now; GS collects the full address when it confirms the order. Nothing is charged by this tool. GS emails the customer the confirmed total before buying. Fees: 0% when paying by crypto/stablecoins or bank transfer, otherwise 5% with a $5 minimum. Once GS confirms a total, the customer can pay by crypto through create_crypto_payment. Legal items only. Call after the user confirms the product link(s), quantity, ship-to state/ZIP, name and email.",
+      inputSchema: {
+        product_urls: z.array(z.string().min(8).max(2000)).min(1).max(20).describe("Product page URL(s) at US stores (http or https)."),
+        quantity: z.number().int().min(1).max(999).default(1),
+        variant: z.string().max(300).optional().describe("Size/color/model details."),
+        max_price_usd: z.number().positive().max(100000).optional().describe("Most the customer will pay for the items."),
+        find_lower_price: z.boolean().default(false).describe("True if GS should also look for a lower price (other stores, coupons, price matching, outlet)."),
+        ship_to_state: z.string().length(2).describe("US state, DC or territory code (e.g. HI, AK, PR) or AA/AE/AP for APO/FPO/DPO."),
+        ship_to_zip: z.string().max(10).describe("5-digit ZIP (or ZIP+4)."),
+        payment_method: paymentMethod.optional().describe("Preferred payment method."),
+        notes: z.string().max(1000).optional(),
+        ...contactShape,
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    },
+    async (a) => {
+      const name = validateName(a.name);
+      if (isFieldError(name)) return fail(name.error);
+      const email = validateEmail(a.email);
+      if (isFieldError(email)) return fail(email.error);
+      const phone = validatePhone(a.phone);
+      if (isFieldError(phone)) return fail(phone.error);
+      const urls = validateHttpUrls(a.product_urls, 20);
+      if (isFieldError(urls)) return fail(urls.error);
+      const state = (a.ship_to_state ?? "").trim().toUpperCase();
+      if (!US_STATES.has(state)) return fail("ship_to_state must be a US state, DC, territory (PR, VI, GU, AS, MP) or AA/AE/AP military code.");
+      const zip = (a.ship_to_zip ?? "").trim();
+      if (!/^\d{5}(-\d{4})?$/.test(zip)) return fail("ship_to_zip must be a 5-digit ZIP (or ZIP+4).");
+      const variant = cleanText(a.variant, 300);
+      const notes = cleanText(a.notes, 1000);
+      const lim = await limiter.checkLead({ ip, email });
+      if (!lim.ok) return fail(leadLimitMessage(lim, GS_URLS.assistedPurchase, GS_CONTACT.email), { retry_after_sec: lim.retryAfterSec, request_page: GS_URLS.assistedPurchase, email: GS_CONTACT.email });
+      const better = a.find_lower_price === true;
+      const summary = [
+        `US domestic purchase request via AI agent (MCP)${better ? " – PRICE-BEAT requested" : ""}`,
+        `Name: ${name} | Email: ${email}${phone ? ` | Phone: ${phone}` : ""}`,
+        `Ship to: ${state} ${zip} (full address to be collected by GS)`,
+        `Products (qty ${a.quantity ?? 1}): ${urls.join(" , ")}`,
+        variant ? `Variant: ${variant}` : "",
+        a.max_price_usd ? `Max price: $${a.max_price_usd}` : "",
+        better ? "Find lower price: yes (other stores, coupons, price match, outlet)" : "",
+        a.payment_method ? `Payment: ${a.payment_method}` : "",
+        notes ? `Notes: ${notes}` : "",
+      ].filter(Boolean).join("\n");
+      const r = await submitLead({ kind: "us_domestic", name, email, phone, destination_country: "US", destination_city: undefined, details: { ...a, product_urls: urls, variant, notes, ship_to_state: state, ship_to_zip: zip }, summary, extraTags: better ? ["price-beat"] : [] }, cfg, f);
+      return json({
+        ...r,
+        next_steps: [
+          better ? "GS looks for a lower price (other stores, coupons, price matching, outlet) and emails the best option; savings are not guaranteed." : "GS checks price and availability and emails the customer the total (item + fee) before buying.",
+          "Fee: 0% when paying by crypto/stablecoins or bank transfer, otherwise 5% with a $5 minimum.",
+          "After GS confirms the total, the customer can pay by crypto via create_crypto_payment (agent) or any invoice method GS offers.",
+          "GS buys and ships directly to the US address (no warehouse forwarding); GS asks for the full street address at confirmation.",
         ],
       });
     },

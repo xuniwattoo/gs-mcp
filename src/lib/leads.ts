@@ -1,10 +1,11 @@
 import type { Config } from "../config.js";
 import { GS_CONTACT, GS_URLS } from "../data/gs.js";
 
-export type LeadKind = "assisted_purchase" | "shipment_quote";
+export type LeadKind = "assisted_purchase" | "shipment_quote" | "us_domestic";
 export const LEAD_TAGS: Record<LeadKind, string> = {
   assisted_purchase: "mcp-assisted-purchase",
   shipment_quote: "mcp-shipping-request",
+  us_domestic: "mcp-us-domestic",
 };
 
 export interface Lead {
@@ -16,12 +17,13 @@ export interface Lead {
   destination_city?: string;
   details: Record<string, unknown>;
   summary: string;
+  extraTags?: string[];
 }
 
 export interface SinkResult { sink: "gohighlevel" | "webhook"; ok: boolean; id?: string; error?: string }
 
 export function makeReference(kind: LeadKind, now = Date.now()): string {
-  const prefix = kind === "assisted_purchase" ? "AP" : "SQ";
+  const prefix = kind === "assisted_purchase" ? "AP" : kind === "us_domestic" ? "US" : "SQ";
   const rand = Array.from(globalThis.crypto.getRandomValues(new Uint8Array(3)), (b) => b.toString(16).padStart(2, "0")).join("").toUpperCase();
   return `GSMCP-${prefix}-${now.toString(36).toUpperCase()}-${rand}`;
 }
@@ -57,7 +59,7 @@ async function sendGhl(lead: Lead, ref: string, cfg: Config, f: typeof fetch): P
     const data: any = await up.json();
     const id: string | undefined = data?.contact?.id ?? data?.id;
     if (!id) return { sink: "gohighlevel", ok: false, error: "upsert returned no contact id" };
-    const tag = await f(`${cfg.ghlApiBase}/contacts/${id}/tags`, { method: "POST", headers, body: JSON.stringify({ tags: [LEAD_TAGS[lead.kind]] }) });
+    const tag = await f(`${cfg.ghlApiBase}/contacts/${id}/tags`, { method: "POST", headers, body: JSON.stringify({ tags: [LEAD_TAGS[lead.kind], ...(lead.extraTags ?? [])] }) });
     const note = await f(`${cfg.ghlApiBase}/contacts/${id}/notes`, { method: "POST", headers, body: JSON.stringify({ body: `[${ref}] ${lead.summary}` }) });
     const err = [!tag.ok && `tag HTTP ${tag.status}`, !note.ok && `note HTTP ${note.status}`].filter(Boolean).join(", ");
     return { sink: "gohighlevel", ok: true, id, error: err || undefined };
@@ -90,8 +92,8 @@ export async function submitLead(lead: Lead, cfg: Config, f: typeof fetch = fetc
   if (cfg.ghlApiToken && cfg.ghlLocationId) results.push(await sendGhl(lead, reference, cfg, f));
   if (cfg.leadWebhookUrl) results.push(await sendWebhook(lead, reference, cfg, f));
   const delivered = results.some((r) => r.ok);
-  const pageUrl = lead.kind === "assisted_purchase" ? GS_URLS.assistedPurchase : GS_URLS.calculator;
-  const mailto = `mailto:${GS_CONTACT.email}?subject=${encodeURIComponent(`${lead.kind === "assisted_purchase" ? "Assisted Purchase request" : "Shipment quote request"} ${reference}`)}&body=${encodeURIComponent(lead.summary)}`;
+  const pageUrl = lead.kind === "assisted_purchase" || lead.kind === "us_domestic" ? GS_URLS.assistedPurchase : GS_URLS.calculator;
+  const mailto = `mailto:${GS_CONTACT.email}?subject=${encodeURIComponent(`${lead.kind === "assisted_purchase" ? "Assisted Purchase request" : lead.kind === "us_domestic" ? "US purchase request" : "Shipment quote request"} ${reference}`)}&body=${encodeURIComponent(lead.summary)}`;
   return {
     reference_id: reference,
     status: delivered ? "submitted" : "not_submitted",
