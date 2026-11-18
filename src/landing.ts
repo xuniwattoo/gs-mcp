@@ -50,7 +50,8 @@ export function imageResponse(pathname: string, method: string): Response | unde
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-export const PAGE_TITLE = "Global Shopaholics MCP: buy from any US store, ship worldwide";
+export const PAGE_TITLE = "Global Shopaholics MCP: Buy From Any US Store, Ship Worldwide";
+export const SHARE_TITLE = "Buy From Any US Store, Ship Worldwide";
 export const PAGE_DESCRIPTION =
   "A free MCP server for AI agents. Claude, ChatGPT, Cursor and others can quote live DHL/FedEx/UPS/USPS shipping, estimate duties, and request a buy-it-for-me order from any US store, shipped to any country.";
 
@@ -77,7 +78,7 @@ export function landingHtml(origin: string): string {
 <link rel="apple-touch-icon" sizes="180x180" href="${origin}/apple-touch-icon.png">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Global Shopaholics">
-<meta property="og:title" content="${esc(PAGE_TITLE)}">
+<meta property="og:title" content="${esc(SHARE_TITLE)}">
 <meta property="og:description" content="${esc(PAGE_DESCRIPTION)}">
 <meta property="og:url" content="${origin}/">
 <meta property="og:image" content="${og}">
@@ -87,7 +88,7 @@ export function landingHtml(origin: string): string {
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Global Shopaholics MCP: Buy from any US store. Ship anywhere. Your AI agent can do it.">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="${esc(PAGE_TITLE)}">
+<meta name="twitter:title" content="${esc(SHARE_TITLE)}">
 <meta name="twitter:description" content="${esc(PAGE_DESCRIPTION)}">
 <meta name="twitter:image" content="${og}">
 <style>

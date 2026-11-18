@@ -15,7 +15,10 @@ describe("landing page at /", () => {
     expect(r.headers.get("content-type")).toContain("text/html");
     expect(r.headers.get("vary")).toMatch(/Accept/);
     const h = await r.text();
-    expect(h).toContain("<title>Global Shopaholics MCP: buy from any US store, ship worldwide</title>");
+    expect(h).toContain("<title>Global Shopaholics MCP: Buy From Any US Store, Ship Worldwide</title>");
+    expect(h).toContain('<meta property="og:title" content="Buy From Any US Store, Ship Worldwide">');
+    expect(h).toContain('<meta name="twitter:title" content="Buy From Any US Store, Ship Worldwide">');
+    expect(h).not.toMatch(/buy from any US store, ship worldwide/);
     for (const tag of ['property="og:title"', 'property="og:description"', 'property="og:site_name" content="Global Shopaholics"', 'name="twitter:card" content="summary_large_image"', 'name="description"', 'rel="apple-touch-icon"', 'rel="icon"'])
       expect(h).toContain(tag);
     expect(h).toContain('property="og:url" content="https://mcp.globalshopaholics.com/"');
