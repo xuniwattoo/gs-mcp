@@ -2,7 +2,9 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { Config } from "./config.js";
 import { GS_ABOUT, GS_CONTACT, GS_FEES, GS_PLANS, GS_SERVICES, GS_URLS, LAST_CHECKED, OWNER_POLICY_NOTE } from "./data/gs.js";
-import { DUTY_RULES } from "./data/duties.js";
+import { PROFILES } from "./data/duty/profiles.js";
+import { CATEGORY_IDS } from "./data/duty/categories.js";
+import type { DutyCacheStore } from "./lib/duty-fallback.js";
 import { getShippingRates, RatesError } from "./lib/rates.js";
 import { estimateLandedCost } from "./lib/landed.js";
 import { submitLead } from "./lib/leads.js";
@@ -20,6 +22,7 @@ export interface ServerDeps {
   clientKey?: string;
   limiter?: Limiter;
   ratesCache?: RatesCacheStore;
+  dutyCache?: DutyCacheStore;
   limiterBackend?: "durable-object" | "memory";
   limiterStatus?: { ok: boolean; rows?: number; error?: string };
 }
@@ -100,10 +103,23 @@ export function createServer(cfg: Config, deps: ServerDeps = {}): McpServer {
     {
       title: "Total landed cost: item + fee + shipping + customs duties & import taxes",
       description:
-        "Estimates what a buyer pays in total to get US goods delivered: item price, optional US sales tax, GS Assisted Purchase fee, live GS shipping (if package weight given) and estimated import duty/VAT for the destination from a sourced rules table (Angola, Saudi Arabia, UAE, UK, Canada, Australia, Nigeria, Pakistan, India, Brazil, Germany, France, Netherlands). Returns a low–high range. Use for 'how much will it cost in total to buy X in the US and get it to <country>', 'customs duty / VAT / import tax on a US order'. Results are ESTIMATES, not quotes.",
+        "Estimates what a buyer pays in total to get US goods delivered: item price, optional US sales tax, GS Assisted Purchase fee, live GS shipping (if package weight given) and import duty, VAT/GST and fees for the destination. Duty is per product category (phones, laptops, clothing, shoes, bags, cosmetics, perfume, watches, jewelry, toys, supplements, auto parts, tools, books and more) from GS's sourced rules for ${PROFILES.length} countries (Angola, Saudi Arabia, UAE, Australia, UK, all EU countries, Canada, Malaysia, Zambia, India, Algeria, Qatar, Pakistan, Nigeria, Brazil, South Africa, Japan, Korea and more), with de minimis thresholds, valuation basis (CIF/FOB), special courier regimes and who collects. Other countries use an external tariff lookup by HS code. Pass items[] (description and/or category or hs_code, unit price, quantity) for per-item results; the agent should infer the category. Returns a central estimate plus a low–high range, sources and last-checked dates. Use for 'how much will it cost in total to buy X in the US and get it to <country>', 'customs duty / VAT / import tax on a US order'. Results are ESTIMATES, not quotes.",
       inputSchema: {
         destination_country: z.string().min(2).describe("ISO 2-letter code or country name."),
-        items_total_usd: z.number().positive().describe("Total price of the items in USD (all quantities)."),
+        items_total_usd: z.number().positive().optional().describe("Total price of the items in USD (all quantities). Optional when items is given."),
+        items: z
+          .array(
+            z.object({
+              description: z.string().max(300).optional().describe("Product name/description, e.g. 'iPhone 17 Pro 256GB' or 'Nike Air Jordan 1 sneakers'."),
+              category: z.string().max(40).optional().describe(`Product category id (infer it): ${CATEGORY_IDS.join(", ")}.`),
+              hs_code: z.string().max(14).optional().describe("HS code if known (6+ digits best)."),
+              unit_price_usd: z.number().min(0).describe("Price per unit in USD."),
+              quantity: z.number().int().min(1).max(1000).optional().describe("Default 1."),
+            }),
+          )
+          .max(50)
+          .optional()
+          .describe("Item lines for per-category duty and tax. Recommended."),
         us_sales_tax_pct: z.number().min(0).max(15).optional().describe("US sales tax % if the store charges it. Default 0 (GS address is in Delaware: no sales tax)."),
         assisted_purchase: z.enum(["none", "standard", "expedited", "executive"]).default("standard").describe("'standard' if GS buys it for you; 'none' if the shopper buys and ships to their GS address."),
         payment_method: paymentMethod.default("card").describe("How the GS invoice will be paid. Bank transfer or crypto: 0% standard assisted-purchase fee."),
@@ -111,7 +127,8 @@ export function createServer(cfg: Config, deps: ServerDeps = {}): McpServer {
         package: z.object(packageShape).optional().describe("Package for a live shipping quote."),
         preferred_carrier: z.string().optional().describe("Pick the cheapest service of this carrier (DHL, FedEx, UPS, USPS)."),
         item_categories: z.number().int().min(1).max(50).optional().describe("Distinct product types (EU €3-per-category duty). Default 1."),
-        hs_code: z.string().optional().describe("Optional HS code; used with Easyship's duty API when configured."),
+        hs_code: z.string().optional().describe("Optional HS code for a single-item order (when items is omitted)."),
+        category: z.string().optional().describe("Optional category id for a single-item order (when items is omitted)."),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
@@ -119,7 +136,7 @@ export function createServer(cfg: Config, deps: ServerDeps = {}): McpServer {
       const lim = await limiter.checkRate({ ip });
       if (!lim.ok) return fail(rateLimitMessage(lim, GS_URLS.calculator), { retry_after_sec: lim.retryAfterSec, calculator: GS_URLS.calculator });
       try {
-        return json(await estimateLandedCost({ ...a, assisted_purchase: a.assisted_purchase ?? "standard", payment_method: a.payment_method ?? "card", package: a.package ? { ...a.package, unit: a.package.unit ?? "kg" } : undefined }, cfg, f, deps.ratesCache));
+        return json(await estimateLandedCost({ ...a, assisted_purchase: a.assisted_purchase ?? "standard", payment_method: a.payment_method ?? "card", package: a.package ? { ...a.package, unit: a.package.unit ?? "kg" } : undefined }, cfg, f, deps.ratesCache, deps.dutyCache));
       } catch (e: any) {
         return fail(e?.message ?? String(e));
       }
@@ -351,7 +368,7 @@ export function aboutMarkdown() {
     ...GS_FEES.map((x) => `- ${x.item}: ${x.value}`),
     `- Note: ${OWNER_POLICY_NOTE}`,
     "",
-    `## Duty estimate coverage\n${DUTY_RULES.map((r) => r.country).join(", ")}`,
+    `## Duty estimate coverage (${PROFILES.length} countries, per product category)\n${PROFILES.map((r) => `${r.name} (${r.confidence})`).join(", ")}\nOther countries: external tariff lookup by HS code (rough guide).`,
     "",
     `_Facts from ${GS_URLS.home} pages, last checked ${LAST_CHECKED}._`,
   ].join("\n");

@@ -1,4 +1,5 @@
 /**
+ * LEGACY (kept for backward compatibility and tests). The live estimator uses src/data/duty/profiles.ts.
  * Small import duty / tax rules table for GS's top destinations.
  * ESTIMATES ONLY. Real duty depends on HS code, declared value, origin and local rules.
  * Each row cites a public source. Checked 2026-11-17. USD equivalents of local-currency

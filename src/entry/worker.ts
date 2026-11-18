@@ -5,10 +5,12 @@ import { cacheApiRatesCache } from "../lib/rates.js";
 import { limiterConfigFrom, type ServerDeps } from "../server.js";
 
 export { LimiterDO } from "../lib/limiter-do.js";
+export { DutyCacheDO } from "../lib/duty-cache-do.js";
+import { DurableDutyCache } from "../lib/duty-cache-do.js";
 
 /** Cloudflare Workers entry (`wrangler deploy`). Vars/secrets arrive on `env`. */
 export default {
-  async fetch(request: Request, env: Record<string, unknown> & { LIMITER?: import("../lib/limiter-do.js").DurableObjectNamespace }): Promise<Response> {
+  async fetch(request: Request, env: Record<string, unknown> & { LIMITER?: import("../lib/limiter-do.js").DurableObjectNamespace; DUTY_CACHE?: import("../lib/limiter-do.js").DurableObjectNamespace }): Promise<Response> {
     const strEnv: Record<string, string | undefined> = {};
     for (const [k, v] of Object.entries(env ?? {})) if (typeof v === "string") strEnv[k] = v;
     const cfg = loadConfig(strEnv);
@@ -22,6 +24,7 @@ export default {
     } else {
       deps.limiterBackend = "memory";
     }
+    if (env?.DUTY_CACHE) deps.dutyCache = new DurableDutyCache(env.DUTY_CACHE);
     try {
       const cacheApi = (globalThis as unknown as { caches?: { default: { match(request: Request): Promise<Response | undefined>; put(request: Request, response: Response): Promise<void> } } }).caches?.default;
       if (cacheApi) deps.ratesCache = cacheApiRatesCache(cacheApi);

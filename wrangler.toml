@@ -20,6 +20,7 @@ GS_ASSISTED_FEE_WAIVED_METHODS = "bank_transfer,crypto"
 ALLOWED_ORIGINS = "*"
 GHL_LOCATION_ID = "cbpCVcgP2Eci9eEvs2Xc"
 
+# EASYSHIP_API_KEY (optional): fallback duty/tax API for countries without a GS profile.
 # Secrets (set with `wrangler secret put NAME`, never commit):
 # GS_RATES_HEADER_NAME, GS_RATES_HEADER_VALUE, GHL_API_TOKEN,
 # LEAD_WEBHOOK_URL, LEAD_WEBHOOK_SECRET, EASYSHIP_API_KEY
@@ -29,6 +30,15 @@ GHL_LOCATION_ID = "cbpCVcgP2Eci9eEvs2Xc"
 name = "LIMITER"
 class_name = "LimiterDO"
 
+[[durable_objects.bindings]]
+name = "DUTY_CACHE"
+class_name = "DutyCacheDO"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["LimiterDO"]
+
+# Permanent duty-rate store (country + HS6) for the fallback lookup.
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["DutyCacheDO"]

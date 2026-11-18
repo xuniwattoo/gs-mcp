@@ -2,7 +2,7 @@
 
 A public, remote [Model Context Protocol](https://modelcontextprotocol.io) server that lets any AI agent (Claude, ChatGPT, Cursor, Grok, …) help a person anywhere **buy from any US store and ship it through Global Shopaholics (GS)**.
 
-It only wraps what GS already has: the website's live rate engine, published fees/plans, the sign-up flow, the Assisted Purchase request process and carrier tracking. Duty/VAT figures come from a small sourced rules table and are always labelled estimates.
+It only wraps what GS already has: the website's live rate engine, published fees/plans, the sign-up flow, the Assisted Purchase request process and carrier tracking. Duty/VAT figures come from GS's sourced per-country, per-product-category rules (87 countries; see [docs/duties.md](docs/duties.md)) and are always labelled estimates with a range.
 
 - Transport: **Streamable HTTP** (stateless, JSON responses) at `/mcp`, plus a **stdio** entry.
 - Runtime: web-standard `Request`/`Response` → runs on **Cloudflare Workers (primary)**, Vercel, or any Node ≥ 20 host (Cloudways).
@@ -13,7 +13,7 @@ It only wraps what GS already has: the website's live rate engine, published fee
 | Tool | What it does |
 |---|---|
 | `get_shipping_rates` | Live DHL / FedEx / UPS / USPS prices, transit times, max weight/size, insurance text and dimensional-weight flag from GS's rate engine (`/wp-json/rate-calculator/v2/getrates`), normalized and sorted. |
-| `estimate_landed_cost` | Item + optional US sales tax + GS Assisted Purchase fee (0% when paid by bank transfer or crypto, otherwise 5% with a $5 minimum; expedited & executive per GS FAQ) + live shipping + estimated duty/VAT (AO, SA, AE, GB, CA, AU, NG, PK, IN, BR, DE, FR, NL). Optional Easyship Tax & Duty API when `EASYSHIP_API_KEY` and an HS code are given. |
+| `estimate_landed_cost` | Item + optional US sales tax + GS Assisted Purchase fee (0% when paid by bank transfer or crypto, otherwise 5% with a $5 minimum; expedited & executive per GS FAQ) + live shipping + estimated duty, VAT/GST and fees per item and product category (phones, laptops, clothing, shoes, cosmetics, perfume…) for 87 countries, with de minimis, CIF/FOB basis, courier regimes and who collects. Other countries: WITS tariff lookup (free) or the Easyship Tax & Duty API when `EASYSHIP_API_KEY` is set, cached permanently by country + HS6. Returns a typical estimate plus low–high range. |
 | `get_services_and_fees` | Services, plans (Basic free, Premium $9.99, Business $14.99) and published fees with source URLs + last-checked date. |
 | `get_started` | How to get the free US address (sign-up: `https://login.globalshopaholics.com/register`) and next steps. |
 | `request_assisted_purchase` | Sends a "buy it for me" request to GS (GoHighLevel and/or webhook), tag `mcp-assisted-purchase`; returns a reference id. Falls back to GS's [Assisted Purchase page](https://globalshopaholics.com/assisted-purchase/) + prefilled email if no sink is configured. |
@@ -131,13 +131,16 @@ src/entry/node.ts        plain Node HTTP entry (Cloudways/VPS)
 src/entry/stdio.ts       stdio entry
 api/mcp.ts, vercel.json  Vercel entry
 src/lib/rates.ts         GS rate engine client + normalizer + 10-min cache
-src/lib/landed.ts        landed-cost estimator, GS fee logic, optional Easyship
+src/lib/landed.ts        landed-cost estimator, GS fee logic
+src/lib/duty-engine.ts   per-item duty/tax engine (profiles + WITS MFN rates)
+src/lib/duty-fallback.ts fallback lookup (Easyship → WITS) + permanent DO cache
 src/lib/leads.ts         GoHighLevel v2 / webhook lead sinks + fallback
 src/lib/ratelimit.ts     limiter contract + in-memory fallback
 src/lib/limiter-do.ts    SQLite Durable Object limiter (Workers)
 src/lib/validate.ts      lead-input sanitization and checks
 src/lib/tracking.ts      carrier detection + URLs
-src/data/*.ts            GS facts (sourced), duty rules (sourced), GS calculator country list
+src/data/*.ts            GS facts (sourced), GS calculator country list
+src/data/duty/           duty profiles, categories, WITS tariff snapshot, GS order priority
 test/                    vitest tests + fixture (real GS response, Angola 5 kg)
 scripts/smoke.ts         end-to-end smoke test
 docs/                    website page copy, deploy guide

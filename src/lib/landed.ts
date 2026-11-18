@@ -1,5 +1,7 @@
 import type { Config } from "../config.js";
-import { findDutyRule, DUTY_RULES } from "../data/duties.js";
+import { findProfile, PROFILES } from "../data/duty/profiles.js";
+import { estimateDuties, resolveItem, type DutyItemInput, type ResolvedItem } from "./duty-engine.js";
+import { fallbackEstimate, type DutyCacheStore } from "./duty-fallback.js";
 import { GS_URLS, OWNER_POLICY_NOTE } from "../data/gs.js";
 import { resolveCountry } from "./countries.js";
 import { getShippingRates, type NormalizedService, type RatesInput, type RatesCacheStore } from "./rates.js";
@@ -9,7 +11,13 @@ export type RequestType = "none" | "standard" | "expedited" | "executive";
 
 export interface LandedInput {
   destination_country: string;
-  items_total_usd: number;
+  /** Total item price in USD. Optional when `items` is given (then the sum of items is used). */
+  items_total_usd?: number;
+  /** Optional item lines for per-category duty. */
+  items?: DutyItemInput[];
+  /** Single-item shortcuts when `items` is omitted. */
+  category?: string;
+  description?: string;
   us_sales_tax_pct?: number;
   assisted_purchase: RequestType;
   payment_method: PaymentMethod;
@@ -31,30 +39,19 @@ export function assistedFee(itemsUsd: number, type: RequestType, method: Payment
   return { fee: r2(fee > 0 ? Math.max(cfg.assistedFeeMinUsd, fee) : 0), basis: `Standard request: ${cfg.assistedFeePct}% of order cost${cfg.assistedFeeMinUsd ? `, $${cfg.assistedFeeMinUsd} minimum` : ""}.` };
 }
 
-async function easyship(cfg: Config, countryCode: string, hs: string, customsValue: number, shipping: number, fetchImpl: typeof fetch) {
-  const res = await fetchImpl(cfg.easyshipTaxUrl, {
-    method: "POST",
-    headers: { authorization: `Bearer ${cfg.easyshipApiKey}`, "content-type": "application/json", accept: "application/json" },
-    body: JSON.stringify({
-      origin_country_alpha2: "US",
-      destination_country_alpha2: countryCode,
-      insurance_fee: 0,
-      shipment_charge: shipping,
-      items: [{ duty_origin_country_alpha2: "US", hs_code: hs.replace(/\D/g, "").padEnd(8, "0").slice(0, 8), customs_value: customsValue }],
-    }),
-  });
-  if (!res.ok) throw new Error(`Easyship HTTP ${res.status}`);
-  return res.json();
-}
-
-export async function estimateLandedCost(input: LandedInput, cfg: Config, fetchImpl: typeof fetch = fetch, store?: RatesCacheStore) {
+export async function estimateLandedCost(input: LandedInput, cfg: Config, fetchImpl: typeof fetch = fetch, store?: RatesCacheStore, dutyCache?: DutyCacheStore) {
   const country = resolveCountry(input.destination_country);
   if (!country) throw new Error(`Unknown destination country "${input.destination_country}".`);
   const notes: string[] = [];
+  const rawItems = (input.items ?? []).filter((i) => i && i.unit_price_usd >= 0);
+  const itemsSum = r2(rawItems.reduce((a, i) => a + i.unit_price_usd * Math.max(1, Math.round(i.quantity ?? 1)), 0));
+  const itemsTotal = rawItems.length ? itemsSum : (input.items_total_usd ?? 0);
+  if (!rawItems.length && !(input.items_total_usd! > 0)) throw new Error("Pass items_total_usd or items[] with unit_price_usd.");
+  if (rawItems.length && input.items_total_usd !== undefined && Math.abs(input.items_total_usd - itemsSum) > 0.01) notes.push(`items_total_usd (${input.items_total_usd}) differs from the sum of items (${itemsSum}); using the item lines.`);
 
-  const salesTax = r2(input.items_total_usd * ((input.us_sales_tax_pct ?? 0) / 100));
+  const salesTax = r2(itemsTotal * ((input.us_sales_tax_pct ?? 0) / 100));
   if (!input.us_sales_tax_pct) notes.push("US sales tax assumed 0%: orders shipped to the GS Delaware address pay no state sales tax. Pass us_sales_tax_pct if the store charges it.");
-  const fee = assistedFee(input.items_total_usd, input.assisted_purchase, input.payment_method, cfg);
+  const fee = assistedFee(itemsTotal, input.assisted_purchase, input.payment_method, cfg);
   if (input.assisted_purchase === "standard") notes.push(OWNER_POLICY_NOTE);
 
   let shipping = input.shipping_usd;
@@ -72,52 +69,48 @@ export async function estimateLandedCost(input: LandedInput, cfg: Config, fetchI
   }
   if (shipping === undefined) notes.push(shippingError ? `Shipping not included: ${shippingError}` : "Shipping not included: pass shipping_usd or package weight to include it.");
 
-  const goods = r2(input.items_total_usd + salesTax + fee.fee);
-  const rule = findDutyRule(country.code);
+  const goods = r2(itemsTotal + salesTax + fee.fee);
+  const extras = salesTax + fee.fee;
+  const resolved: ResolvedItem[] = rawItems.length
+    ? rawItems.map((it) => {
+        const ri = resolveItem(it);
+        return { ...ri, value_usd: ri.value_usd + (itemsTotal > 0 ? (extras * ri.value_usd) / itemsTotal : extras / rawItems.length) };
+      })
+    : [{ ...resolveItem({ hs_code: input.hs_code, category: input.category, description: input.description, unit_price_usd: input.items_total_usd ?? 0 }), value_usd: goods }];
+
+  const profile = findProfile(country.code);
   let duty: any = null;
-  if (input.hs_code && cfg.easyshipApiKey) {
+  if (profile) {
+    duty = estimateDuties(profile, resolved, shipping ?? 0, { itemCategories: rawItems.length ? undefined : input.item_categories });
+    duty.de_minimis_summary = [
+      profile.duty_de_minimis ? `Duty-free up to ${profile.duty_de_minimis.currency} ${profile.duty_de_minimis.local.toLocaleString("en-US")} (~$${profile.duty_de_minimis.usd}, ${profile.duty_de_minimis.basis === "cif" ? "incl. shipping" : "goods value"}${profile.duty_de_minimis.certainty !== "firm" ? ", conditions apply" : ""})` : "No duty de minimis",
+      profile.tax_de_minimis ? `${profile.tax.name} free up to ${profile.tax_de_minimis.currency} ${profile.tax_de_minimis.local.toLocaleString("en-US")} (~$${profile.tax_de_minimis.usd})` : `${profile.tax.name} due from the first dollar (unless noted)`,
+    ].join("; ");
+  } else {
     try {
-      duty = { method: "easyship_api", raw: await easyship(cfg, country.code, input.hs_code, input.items_total_usd, shipping ?? 0, fetchImpl) };
+      duty = (await fallbackEstimate(cfg, country.code, resolved, shipping ?? 0, fetchImpl, dutyCache)) ?? null;
     } catch (e: any) {
-      notes.push(`Easyship duty lookup failed (${e?.message}); using GS rules table.`);
+      notes.push(`Fallback duty lookup failed (${e?.message ?? e}).`);
     }
+    if (!duty) notes.push(`No duty rules for ${country.name} yet (GS covers ${PROFILES.length} countries). Check with local customs; import duty/tax is NOT included.`);
   }
-  if (!duty && rule) {
-    const est = rule.estimate({ goodsUsd: goods, shippingUsd: shipping ?? 0, itemCategories: input.item_categories ?? 1 });
-    duty = {
-      method: "rules_table",
-      country: rule.country,
-      tax_name: rule.taxName,
-      tax_rate_pct: rule.taxRatePct,
-      de_minimis: rule.deMinimis,
-      typical_duty_pct: rule.typicalDutyPct,
-      duty_usd: { low: est.dutyLow, high: est.dutyHigh },
-      tax_usd: { low: est.taxLow, high: est.taxHigh },
-      other_fees_usd: { low: est.otherLow, high: est.otherHigh },
-      total_usd: { low: r2(est.dutyLow + est.taxLow + est.otherLow), high: r2(est.dutyHigh + est.taxHigh + est.otherHigh) },
-      notes: est.notes,
-      sources: rule.sources,
-    };
-  }
-  if (!duty) notes.push(`No duty rules for ${country.name} yet (covered: ${DUTY_RULES.map((r) => r.code).join(", ")}). Check with local customs; import duty/tax is NOT included.`);
 
   const base = goods + (shipping ?? 0);
-  const dutyLow = duty?.total_usd?.low ?? 0;
-  const dutyHigh = duty?.total_usd?.high ?? 0;
+  const t = duty?.total_usd ?? { low: 0, typical: 0, high: 0 };
   return {
     estimate: true,
     label: "ESTIMATE ONLY – not a quote. Final duties/taxes are set by destination customs; GS confirms fees before purchase.",
     destination: { country_code: country.code, country: country.name },
     breakdown_usd: {
-      items: r2(input.items_total_usd),
+      items: r2(itemsTotal),
       us_sales_tax: salesTax,
       gs_assisted_purchase_fee: fee.fee,
       gs_fee_basis: fee.basis,
       international_shipping: shipping ?? null,
       shipping_service: shippingService ? `${shippingService.carrier} – ${shippingService.service} (${shippingService.transit_time ?? "n/a"})` : null,
-      import_duty_and_tax: duty?.total_usd ?? (duty?.method === "easyship_api" ? "see duty.raw" : null),
+      import_duty_and_tax: duty?.total_usd ?? null,
     },
-    total_landed_usd: { low: r2(base + dutyLow), high: r2(base + dutyHigh) },
+    total_landed_usd: { low: r2(base + t.low), typical: r2(base + t.typical), high: r2(base + t.high) },
     duty,
     notes,
     sources: [GS_URLS.faqs, GS_URLS.assistedPurchase, GS_URLS.calculator],

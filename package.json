@@ -24,7 +24,9 @@
     "cf:deploy": "wrangler deploy",
     "mcpb:build": "esbuild mcpb/src/proxy.ts --bundle --platform=node --format=esm --target=node18 --outfile=mcpb/server/index.js --banner:js=\"import{createRequire}from'module';const require=createRequire(import.meta.url);\" && cd mcpb && npx -y @anthropic-ai/mcpb pack . global-shopaholics.mcpb",
     "site-files": "tsx scripts/gen-site-files.ts",
-    "openai:zip": "python3 -c \"import shutil;shutil.make_archive('plugins/openai/global-shopaholics-openai-plugin','zip','plugins/openai/global-shopaholics')\""
+    "openai:zip": "python3 -c \"import shutil;shutil.make_archive('plugins/openai/global-shopaholics-openai-plugin','zip','plugins/openai/global-shopaholics')\"",
+    "duty:freshness": "tsx scripts/duty-freshness.ts",
+    "duty:wits": "tsx scripts/fetch-wits.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
