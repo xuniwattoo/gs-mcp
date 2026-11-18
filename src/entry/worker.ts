@@ -2,6 +2,7 @@ import { loadConfig } from "../config.js";
 import { handleRequest } from "../http.js";
 import { DurableLimiter } from "../lib/limiter-do.js";
 import { cacheApiRatesCache } from "../lib/rates.js";
+import { cacheApiJsonCache } from "../lib/price-search.js";
 import { limiterConfigFrom, type ServerDeps } from "../server.js";
 
 export { LimiterDO } from "../lib/limiter-do.js";
@@ -27,7 +28,7 @@ export default {
     if (env?.DUTY_CACHE) deps.dutyCache = new DurableDutyCache(env.DUTY_CACHE);
     try {
       const cacheApi = (globalThis as unknown as { caches?: { default: { match(request: Request): Promise<Response | undefined>; put(request: Request, response: Response): Promise<void> } } }).caches?.default;
-      if (cacheApi) deps.ratesCache = cacheApiRatesCache(cacheApi);
+      if (cacheApi) { deps.ratesCache = cacheApiRatesCache(cacheApi); deps.priceCache = cacheApiJsonCache(cacheApi, "price-cache"); }
     } catch {
       /* Cache API unavailable */
     }

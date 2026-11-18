@@ -20,6 +20,7 @@ GS_ASSISTED_FEE_WAIVED_METHODS = "bank_transfer,crypto"
 ALLOWED_ORIGINS = "*"
 GHL_LOCATION_ID = "cbpCVcgP2Eci9eEvs2Xc"
 
+# SERPER_API_KEY: find_lower_price (Google Shopping via Serper).
 # BTCPAY_URL, BTCPAY_STORE_ID, BTCPAY_API_KEY: crypto checkout (key = create+view invoices only).
 # EASYSHIP_API_KEY (optional): fallback duty/tax API for countries without a GS profile.
 # Secrets (set with `wrangler secret put NAME`, never commit):

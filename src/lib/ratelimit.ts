@@ -11,11 +11,14 @@ export interface LimiterConfig {
   leadPerEmailPerDay: number;
   leadDailyCap: number;
   ratePerIpPerHour: number;
+  /** Tighter hourly cap for the paid price-search tool (default 10). */
+  pricePerIpPerHour?: number;
 }
 
 export interface Limiter {
   checkLead(input: { ip: string; email: string }, now?: number): Promise<LimitResult>;
   checkRate(input: { ip: string }, now?: number): Promise<LimitResult>;
+  checkPrice(input: { ip: string }, now?: number): Promise<LimitResult>;
 }
 
 export function defaultLimiterConfig(partial: Partial<LimiterConfig> = {}): LimiterConfig {
@@ -88,10 +91,12 @@ export class MemoryLimiter implements Limiter {
   private emailLead = new Map<string, number[]>();
   private globalLead = new Map<string, number>();
   private rateIp: RateLimiter;
+  private priceIp: RateLimiter;
 
   constructor(private cfg: LimiterConfig) {
     this.ipLead = new RateLimiter(cfg.leadPerIpPerHour, 60 * 60 * 1000);
     this.rateIp = new RateLimiter(cfg.ratePerIpPerHour, 60 * 60 * 1000);
+    this.priceIp = new RateLimiter(cfg.pricePerIpPerHour ?? 10, 60 * 60 * 1000);
   }
 
   async checkLead({ ip, email }: { ip: string; email: string }, now = Date.now()): Promise<LimitResult> {
@@ -117,6 +122,11 @@ export class MemoryLimiter implements Limiter {
     if (this.emailLead.size > 10000) this.emailLead.delete(this.emailLead.keys().next().value!);
     for (const k of this.globalLead.keys()) if (k < day) this.globalLead.delete(k);
     return { ok: true, retryAfterSec: 0 };
+  }
+
+  async checkPrice({ ip }: { ip: string }, now = Date.now()): Promise<LimitResult> {
+    const r = this.priceIp.check(`price:${ip}`, now);
+    return r.ok ? r : { ...r, reason: "rate" };
   }
 
   async checkRate({ ip }: { ip: string }, now = Date.now()): Promise<LimitResult> {

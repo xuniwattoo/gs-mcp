@@ -16,6 +16,8 @@ export interface Config {
   ghlApiBase: string;
   leadWebhookUrl?: string;
   leadWebhookSecret?: string;
+  serperApiKey?: string;
+  pricePerIpPerHour: number;
   btcpayUrl?: string;
   btcpayApiKey?: string;
   btcpayStoreId?: string;
@@ -54,6 +56,8 @@ export function loadConfig(env: EnvRecord = {}): Config {
     ghlApiBase: str(env.GHL_API_BASE) ?? "https://services.leadconnectorhq.com",
     leadWebhookUrl: str(env.LEAD_WEBHOOK_URL),
     leadWebhookSecret: str(env.LEAD_WEBHOOK_SECRET),
+    serperApiKey: str(env.SERPER_API_KEY),
+    pricePerIpPerHour: num(env.PRICE_SEARCH_PER_HOUR, 10),
     btcpayUrl: str(env.BTCPAY_URL)?.replace(/\/+$/, ""),
     btcpayApiKey: str(env.BTCPAY_API_KEY),
     btcpayStoreId: str(env.BTCPAY_STORE_ID),

@@ -16,7 +16,7 @@ describe("MCP over web-standard Streamable HTTP", () => {
     const init = await rpc({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "t", version: "1" } } });
     expect(init.json.result.serverInfo.name).toBe("global-shopaholics");
     const tools = await rpc({ jsonrpc: "2.0", id: 2, method: "tools/list" });
-    expect(tools.json.result.tools.map((t: any) => t.name).sort()).toEqual(["create_crypto_payment", "estimate_landed_cost", "get_crypto_payment_status", "get_services_and_fees", "get_shipping_rates", "get_started", "request_assisted_purchase", "request_shipment_quote", "request_us_purchase", "track_shipment"]);
+    expect(tools.json.result.tools.map((t: any) => t.name).sort()).toEqual(["create_crypto_payment", "estimate_landed_cost", "find_lower_price", "get_crypto_payment_status", "get_services_and_fees", "get_shipping_rates", "get_started", "request_assisted_purchase", "request_shipment_quote", "request_us_purchase", "track_shipment"]);
     const res = await rpc({ jsonrpc: "2.0", id: 3, method: "resources/list" });
     expect(res.json.result.resources[0].uri).toBe("gs://about");
     const pr = await rpc({ jsonrpc: "2.0", id: 4, method: "prompts/list" });

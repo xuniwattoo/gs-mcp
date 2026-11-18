@@ -52,6 +52,7 @@ Tools:
 - get_services_and_fees: plans and published fees.
 - get_started: how to get a free US shipping address.
 - request_assisted_purchase: ask GS to buy from a US store for the user (GS confirms the total by email; nothing is charged in chat).
+- find_lower_price: compare US prices for a product (Google Shopping, cheapest first, savings vs current price; indicative, no affiliate links). GS can then buy the cheapest legitimate option via request_us_purchase or request_assisted_purchase.
 - request_us_purchase: US domestic buy-for-me: GS buys from any US store and ships to a US address (incl. HI, AK, PR, APO/FPO); optional lower-price search (other stores, coupons, price match, outlet; savings not guaranteed). Only ship-to state and ZIP needed; GS confirms the total by email.
 - request_shipment_quote: custom quotes for heavy/oversize items, freight or customs paperwork.
 - create_crypto_payment: crypto checkout (Bitcoin, Lightning, stablecoins) for an amount GS has quoted; 0% GS fee. Returns a checkout link.

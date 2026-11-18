@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "global-shopaholics",
   "display_name": "Global Shopaholics",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Buy from any US store for you: ship worldwide or in the US, find it cheaper, pay in crypto.",
   "long_description": "Connects Claude to the free public Global Shopaholics MCP server (https://mcp.globalshopaholics.com/mcp). Get live DHL, FedEx, UPS and USPS rates from the GS US warehouse to any country, estimate total landed cost including customs duties and import taxes, get a free US shipping address, and ask Global Shopaholics to buy an item from any US store for you. GS confirms every order and its total by email before buying; nothing is charged in chat. Legal items only.",
   "author": {
@@ -29,6 +29,7 @@
     { "name": "get_services_and_fees", "description": "Global Shopaholics services, plans, fees and payment methods." },
     { "name": "get_started", "description": "Get a free US shipping address for package forwarding." },
     { "name": "request_assisted_purchase", "description": "Ask GS to buy from any US store for you (confirmed by email; nothing charged in chat)." },
+    { "name": "find_lower_price", "description": "Find it cheaper at US stores: cheapest offers and savings (indicative)." },
     { "name": "request_us_purchase", "description": "Buy for me inside the US: any US store, find it cheaper, HI/AK/PR/APO delivery." },
     { "name": "request_shipment_quote", "description": "Custom quote for heavy/oversize, freight or customs paperwork." },
     { "name": "create_crypto_payment", "description": "Crypto checkout link for an amount GS has quoted (0% fee)." },

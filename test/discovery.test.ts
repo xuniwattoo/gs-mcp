@@ -55,7 +55,7 @@ describe("tool metadata for agent directories (ChatGPT/Claude)", () => {
   it("every tool has a title and explicit readOnly/destructive/openWorld hints", async () => {
     const res = await handleRequest(new Request("http://x/mcp", { method: "POST", headers: H, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }) }));
     const tools = ((await res.json()) as any).result.tools;
-    expect(tools.length).toBe(10);
+    expect(tools.length).toBe(11);
     for (const t of tools) {
       expect(t.title, t.name).toBeTruthy();
       expect(typeof t.annotations.readOnlyHint, t.name).toBe("boolean");

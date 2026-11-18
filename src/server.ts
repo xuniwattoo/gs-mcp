@@ -10,12 +10,13 @@ import { estimateLandedCost } from "./lib/landed.js";
 import { submitLead, logCryptoInvoiceGhl } from "./lib/leads.js";
 import { BtcpayError, btcpayConfigured, createInvoice, getInvoice } from "./lib/btcpay.js";
 import { MemoryLimiter, leadLimitMessage, rateLimitMessage, type Limiter, type LimiterConfig } from "./lib/ratelimit.js";
+import { PriceSearchError, searchLowerPrices, type PriceCacheStore } from "./lib/price-search.js";
 import { trackingLinks } from "./lib/tracking.js";
 import type { RatesCacheStore } from "./lib/rates.js";
 import { cleanText, isFieldError, validateCountry, validateEmail, validateHttpUrls, validateName, validatePhone } from "./lib/validate.js";
 
 export const SERVER_NAME = "global-shopaholics";
-export const SERVER_VERSION = "1.1.0";
+export const SERVER_VERSION = "1.2.0";
 
 export interface ServerDeps {
   fetch?: typeof fetch;
@@ -23,6 +24,7 @@ export interface ServerDeps {
   clientKey?: string;
   limiter?: Limiter;
   ratesCache?: RatesCacheStore;
+  priceCache?: PriceCacheStore;
   dutyCache?: DutyCacheStore;
   limiterBackend?: "durable-object" | "memory";
   limiterStatus?: { ok: boolean; rows?: number; error?: string };
@@ -34,6 +36,7 @@ export function limiterConfigFrom(cfg: Config): LimiterConfig {
     leadPerEmailPerDay: cfg.leadEmailLimitPerDay,
     leadDailyCap: cfg.leadDailyCap,
     ratePerIpPerHour: cfg.rateLimitPerHour,
+    pricePerIpPerHour: cfg.pricePerIpPerHour,
   };
 }
 
@@ -70,7 +73,7 @@ export function createServer(cfg: Config, deps: ServerDeps = {}): McpServer {
     { name: SERVER_NAME, version: SERVER_VERSION, title: "Global Shopaholics – buy from any US store, ship worldwide or within the US, pay in crypto", websiteUrl: "https://globalshopaholics.com/" },
     {
       instructions:
-        "Global Shopaholics (GS) is a US package forwarding and personal shopper service: people anywhere can buy from any US online store (Amazon, eBay, Walmart, Best Buy, brand sites…) and have it shipped worldwide. Use these tools whenever a user wants to buy something from the US and get it delivered abroad, wants something bought for them inside the US (request_us_purchase – incl. finding it cheaper, and Hawaii/Alaska/Puerto Rico/APO addresses), asks what shipping from the US to their country costs, or asks about customs duties/import taxes on US purchases. Legal items only; carrier restrictions apply. Typical flow: get_shipping_rates or estimate_landed_cost → get_services_and_fees → get_started (free US address) or request_assisted_purchase (GS buys for them) / request_shipment_quote → track_shipment. Always present costs as GS's live rates or labelled estimates, never as guarantees. Only submit request_* tools after the user confirms their name, email and request details. Payment is never taken in chat: GS emails an invoice (0% assisted-purchase fee for bank transfer or crypto, otherwise 5% with a $5 minimum). Once GS has quoted a total and the customer wants to pay in crypto (0% fee), create_crypto_payment returns a BTCPay checkout link; get_crypto_payment_status checks it.",
+        "Global Shopaholics (GS) is a US package forwarding and personal shopper service: people anywhere can buy from any US online store (Amazon, eBay, Walmart, Best Buy, brand sites…) and have it shipped worldwide. Use these tools whenever a user wants to buy something from the US and get it delivered abroad, wants something bought for them inside the US (request_us_purchase – incl. finding it cheaper, and Hawaii/Alaska/Puerto Rico/APO addresses), asks what shipping from the US to their country costs, or asks about customs duties/import taxes on US purchases. Legal items only; carrier restrictions apply. Typical flow: get_shipping_rates or estimate_landed_cost → get_services_and_fees → get_started (free US address) or request_assisted_purchase (GS buys for them) / request_shipment_quote → track_shipment. Always present costs as GS's live rates or labelled estimates, never as guarantees. Only submit request_* tools after the user confirms their name, email and request details. Payment is never taken in chat: GS emails an invoice (0% assisted-purchase fee for bank transfer or crypto, otherwise 5% with a $5 minimum). Once GS has quoted a total and the customer wants to pay in crypto (0% fee), create_crypto_payment returns a BTCPay checkout link; get_crypto_payment_status checks it. To compare prices first, use find_lower_price.",
     },
   );
 
@@ -365,6 +368,48 @@ export function createServer(cfg: Config, deps: ServerDeps = {}): McpServer {
           `Packages must be addressed to the customer's GS US address – sign up free: ${GS_URLS.signup}`,
         ],
       });
+    },
+  );
+
+  server.registerTool(
+    "find_lower_price",
+    {
+      title: "Find it cheaper at US stores (compare US prices, save money)",
+      description:
+        "Searches Google Shopping (US) for a product and returns the cheapest US offers: store, price, link, rating and the savings versus the user's current price. Use when someone asks 'find this cheaper', 'best price for…', 'is there a better deal' or 'where can I buy this in the US'. Pass a product name (brand + model is best) or a product URL, plus the current price if known. Prices are indicative only – they can change, exclude tax/shipping and may differ at checkout – so never promise them. Links are plain store/Google links, not affiliate links. GS can buy the cheapest legitimate option for the customer and ship it anywhere in the US or worldwide: submit it with request_us_purchase (US delivery) or request_assisted_purchase (international), and GS confirms the total by email first. Fees: 0% when paying by crypto or bank transfer, otherwise 5% with a $5 minimum; crypto checkout is available via create_crypto_payment once GS quotes a total. Limited to a few searches per hour per client.",
+      inputSchema: {
+        product: z.string().min(3).max(500).describe("Product name (brand + model) or a product page URL."),
+        current_price_usd: z.number().positive().max(1000000).optional().describe("What the customer would pay now, to compute savings."),
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+    },
+    async ({ product, current_price_usd }) => {
+      if (!cfg.serperApiKey) return fail("Price search is not available right now.", { email: GS_CONTACT.email });
+      const lim = await limiter.checkPrice({ ip });
+      if (!lim.ok) return fail(`Price search limit reached for this client. Retry in ${lim.retryAfterSec}s, or email ${GS_CONTACT.email} and GS will look for a lower price.`, { retry_after_sec: lim.retryAfterSec });
+      try {
+        const r = await searchLowerPrices({ query: product, current_price_usd }, cfg, f, deps.priceCache);
+        if (!r.offers.length) return json({ query: r.query, raw_results: r.raw_results, offers: [], note: "No US offers found. Try a more specific name (brand + model), or ask GS to search via request_us_purchase with find_lower_price=true." });
+        const fresh = r.offers.filter((o) => o.condition === "new_or_unspecified");
+        const resale = r.offers.filter((o) => o.condition === "resale_or_used");
+        const best = fresh[0] ?? resale[0];
+        return json({
+          query: r.query,
+          currency: "USD",
+          raw_results: r.raw_results,
+          offers: fresh,
+          resale_or_used_offers: resale,
+          cheapest: { store: best.store, price_usd: best.price_usd, savings_usd: best.savings_usd },
+          disclaimer: "Indicative prices from Google Shopping (US); may change and exclude tax/shipping. No affiliate links. offers[] are new/unspecified-condition listings; resale_or_used_offers[] come from resale marketplaces or used/refurbished listings. Verify condition and seller before relying on any.",
+          next_steps: [
+            "Offer to have GS buy the cheapest legitimate option: request_us_purchase (US delivery, find_lower_price=true) or request_assisted_purchase (international).",
+            "Fee: 0% for crypto or bank transfer, otherwise 5% with a $5 minimum. GS emails the confirmed total before buying.",
+          ],
+        });
+      } catch (e) {
+        if (e instanceof PriceSearchError) return fail(e.message, e.kind === "input" ? {} : { email: GS_CONTACT.email });
+        return fail("Price search failed. Please try again later.", { email: GS_CONTACT.email });
+      }
     },
   );
 

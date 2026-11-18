@@ -16,7 +16,7 @@ export interface DurableObjectNamespace {
 const HOUR_MS = 60 * 60 * 1000;
 const RETENTION_MS = 48 * 60 * 60 * 1000;
 
-type Op = "checkLead" | "checkRate" | "status";
+type Op = "checkLead" | "checkRate" | "checkPrice" | "status";
 export interface LimiterRequest {
   op: Op;
   ip?: string;
@@ -70,6 +70,7 @@ export function applyLimiterOp(sql: LimiterSql, body: LimiterRequest): LimitResu
   }
   const limits = body.limits;
   if (!limits) return { ok: false, retryAfterSec: 60, reason: body.op === "checkRate" ? "rate" : "ip" };
+  if (body.op === "checkPrice") return checkPrice(sql, body.ip ?? "unknown", limits, now);
   if (body.op === "checkRate") return checkRate(sql, body.ip ?? "unknown", limits, now);
   return checkLead(sql, body.ip ?? "unknown", body.email ?? "", limits, now);
 }
@@ -96,6 +97,16 @@ function checkLead(sql: LimiterSql, ip: string, email: string, limits: LimiterCo
 
   add(sql, emailKey, now);
   add(sql, globalKey, now);
+  add(sql, ipKey, now);
+  return { ok: true, retryAfterSec: 0 };
+}
+
+function checkPrice(sql: LimiterSql, ip: string, limits: LimiterConfig, now: number): LimitResult {
+  const ipKey = `price:ip:${ip}`;
+  if (count(sql, ipKey, now - HOUR_MS) >= (limits.pricePerIpPerHour ?? 10)) {
+    const oldest = oldestTs(sql, ipKey, now - HOUR_MS);
+    return { ok: false, retryAfterSec: Math.max(1, Math.ceil((HOUR_MS - (now - (oldest ?? now))) / 1000)), reason: "rate" };
+  }
   add(sql, ipKey, now);
   return { ok: true, retryAfterSec: 0 };
 }
@@ -172,6 +183,11 @@ export class DurableLimiter implements Limiter {
 
   async checkRate(input: { ip: string }): Promise<LimitResult> {
     const data = await this.rpc("checkRate", input);
+    return { ok: !!data.ok, retryAfterSec: Number(data.retryAfterSec ?? 60), reason: data.ok ? undefined : "rate" };
+  }
+
+  async checkPrice(input: { ip: string }): Promise<LimitResult> {
+    const data = await this.rpc("checkPrice", input);
     return { ok: !!data.ok, retryAfterSec: Number(data.retryAfterSec ?? 60), reason: data.ok ? undefined : "rate" };
   }
 

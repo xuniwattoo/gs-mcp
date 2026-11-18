@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/v1/server-card.schema.json",
   "name": "io.github.xuniwattoo/gs-mcp",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "title": "Global Shopaholics",
   "description": "Buy from any US store for you: ship worldwide or in the US, find it cheaper, pay in crypto.",
   "websiteUrl": "https://globalshopaholics.com/mcp/",
