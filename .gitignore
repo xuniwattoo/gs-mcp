@@ -7,3 +7,4 @@ dist
 mcpb/server/
 *.mcpb
 plugins/openai/*.zip
+.stats_token

@@ -3,6 +3,7 @@ import { loadConfig, type Config, type EnvRecord } from "./config.js";
 import { canonicalizeClientIp } from "./lib/ip.js";
 import { createServer, SERVER_NAME, SERVER_VERSION, type ServerDeps } from "./server.js";
 import { discoveryResponse } from "./discovery.js";
+import { describeMessage, readStats, recordUsage, responseOk, timingSafeEq, uaFamily, type UsageEvent } from "./lib/usage.js";
 import { imageResponse, landingResponse, selfOrigin, wantsHtml } from "./landing.js";
 
 function cors(cfg: Config, req: Request): Record<string, string> {
@@ -76,6 +77,14 @@ export async function handleRequest(req: Request, env: EnvRecord = {}, deps: Ser
     const d = discoveryResponse(url.pathname, origin, env);
     if (d) return d;
   }
+  if (url.pathname === "/stats") {
+    const token = env.STATS_TOKEN;
+    const given = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
+    if (!token || !given || !timingSafeEq(given, token)) return new Response("Unauthorized", { status: 401, headers: { ...c, "cache-control": "no-store" } });
+    if (!deps.usageStore) return Response.json({ error: "usage storage not configured" }, { status: 503 });
+    const days = Number(url.searchParams.get("days") ?? "7");
+    return Response.json(await readStats(deps.usageStore, days), { headers: { ...c, "cache-control": "no-store" } });
+  }
   if (url.pathname !== "/mcp") return new Response("Not found", { status: 404, headers: c });
 
   if (req.method === "GET" || req.method === "DELETE") {
@@ -83,11 +92,34 @@ export async function handleRequest(req: Request, env: EnvRecord = {}, deps: Ser
     return withHeaders(Response.json({ jsonrpc: "2.0", error: { code: -32000, message: "Method not allowed (stateless server: use POST)." }, id: null }, { status: 405 }), { ...c, allow: "POST, OPTIONS" });
   }
 
+  // Usage counting: parse a copy of the body for method/tool/clientInfo only (never arguments).
+  let msgs: ReturnType<typeof describeMessage>[] = [];
+  if (deps.usageStore) {
+    try {
+      const parsed = await req.clone().json();
+      msgs = (Array.isArray(parsed) ? parsed : [parsed]).filter((m) => m && typeof m === "object" && m.method).map(describeMessage);
+    } catch { /* not JSON: ignore */ }
+  }
+  const countUsage = async (res: Response | undefined) => {
+    if (!deps.usageStore || !msgs.length) return;
+    try {
+      let ok = !!res && res.status < 400;
+      if (res && ok) { try { ok = responseOk(await res.clone().json()); } catch { /* keep status-based */ } }
+      const ua = uaFamily(req.headers.get("user-agent"));
+      const country = String((req as unknown as { cf?: { country?: string } }).cf?.country ?? "unknown").slice(0, 8);
+      const events: UsageEvent[] = msgs.map((m) => ({ ...m, ua, country, ok }));
+      const p = recordUsage(deps.usageStore, events);
+      if (deps.waitUntil) deps.waitUntil(p); else await p;
+    } catch { /* never break the MCP */ }
+  };
+
   const server = createServer(cfg, { clientKey: clientKeyFrom(req), ...deps });
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
   await server.connect(transport);
   try {
-    const res = await transport.handleRequest(req);
+    let res: Response;
+    try { res = await transport.handleRequest(req); } catch (e) { await countUsage(undefined); throw e; }
+    await countUsage(res);
     return withHeaders(res, c);
   } finally {
     // JSON mode: response body is fully built once handleRequest resolves.

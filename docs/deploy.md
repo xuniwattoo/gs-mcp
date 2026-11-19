@@ -94,3 +94,11 @@ To make it reliable from Cloudflare Workers (shared Cloudflare egress IPs) or an
 Only `/wp-json/rate-calculator/v2/getrates` (POST) needs the exception. Also consider whitelisting at Cloudflare (WAF custom rule → Skip) if bot-fight mode is ever enabled.
 
 When blocked, `get_shipping_rates` returns a clear error with the website calculator link, and `estimate_landed_cost` still returns the fee + duty parts.
+
+## Usage counters (`/stats`)
+
+Every `/mcp` POST is counted in a SQLite Durable Object (`USAGE_DO`, class `UsageDO`, free plan): method, tool name (`tools/call`), `clientInfo` name/version (`initialize` only), coarse user-agent family, `request.cf.country`, ok/error, per UTC day. No IPs, emails or tool arguments are stored. Writes run in `ctx.waitUntil`; storage errors are swallowed and never affect the MCP. Rows are kept 120 days.
+
+- Read: `GET /stats?days=7` with `Authorization: Bearer $STATS_TOKEN` (401 otherwise). Or run `scripts/stats.sh 7` (token in gitignored `.stats_token`).
+- Secret: `CLOUDFLARE_ACCOUNT_ID=bd278cd7f2b3921e4b3c9eeff0a95396 npx wrangler secret put STATS_TOKEN`.
+- Why a DO and not KV: creating a KV namespace was denied for our Workers Admin role (auth error 10000); GraphQL analytics is also denied.

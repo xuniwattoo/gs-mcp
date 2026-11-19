@@ -26,6 +26,9 @@ export interface ServerDeps {
   ratesCache?: RatesCacheStore;
   priceCache?: PriceCacheStore;
   dutyCache?: DutyCacheStore;
+  /** Usage counters (SQLite Durable Object). Optional; failures are swallowed. */
+  usageStore?: import("./lib/usage.js").UsageStore;
+  waitUntil?: (p: Promise<unknown>) => void;
   limiterBackend?: "durable-object" | "memory";
   limiterStatus?: { ok: boolean; rows?: number; error?: string };
 }

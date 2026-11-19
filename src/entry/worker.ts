@@ -7,15 +7,18 @@ import { limiterConfigFrom, type ServerDeps } from "../server.js";
 
 export { LimiterDO } from "../lib/limiter-do.js";
 export { DutyCacheDO } from "../lib/duty-cache-do.js";
+import { DurableUsage } from "../lib/usage-do.js";
+export { UsageDO } from "../lib/usage-do.js";
 import { DurableDutyCache } from "../lib/duty-cache-do.js";
 
 /** Cloudflare Workers entry (`wrangler deploy`). Vars/secrets arrive on `env`. */
 export default {
-  async fetch(request: Request, env: Record<string, unknown> & { LIMITER?: import("../lib/limiter-do.js").DurableObjectNamespace; DUTY_CACHE?: import("../lib/limiter-do.js").DurableObjectNamespace }): Promise<Response> {
+  async fetch(request: Request, env: Record<string, unknown> & { USAGE_DO?: import("../lib/limiter-do.js").DurableObjectNamespace } & { LIMITER?: import("../lib/limiter-do.js").DurableObjectNamespace; DUTY_CACHE?: import("../lib/limiter-do.js").DurableObjectNamespace }, ctx?: { waitUntil(p: Promise<unknown>): void }): Promise<Response> {
     const strEnv: Record<string, string | undefined> = {};
     for (const [k, v] of Object.entries(env ?? {})) if (typeof v === "string") strEnv[k] = v;
     const cfg = loadConfig(strEnv);
     const deps: ServerDeps = {};
+    if (env?.USAGE_DO) { deps.usageStore = new DurableUsage(env.USAGE_DO); if (ctx) deps.waitUntil = (p) => ctx.waitUntil(p); }
     if (env?.LIMITER) {
       const durable = new DurableLimiter(env.LIMITER, limiterConfigFrom(cfg));
       deps.limiter = durable;
