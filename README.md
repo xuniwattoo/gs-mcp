@@ -1,5 +1,7 @@
 # Global Shopaholics MCP server
 
+[![Global Shopaholics MCP connector](https://glama.ai/mcp/connectors/io.github.xuniwattoo/gs-mcp/badges/score.svg)](https://glama.ai/mcp/connectors/io.github.xuniwattoo/gs-mcp)
+
 A public, remote [Model Context Protocol](https://modelcontextprotocol.io) server that lets any AI agent (Claude, ChatGPT, Cursor, Grok, …) help a person anywhere **buy from any US store and ship it through Global Shopaholics (GS)**.
 
 It only wraps what GS already has: the website's live rate engine, published fees/plans, the sign-up flow, the Assisted Purchase request process and carrier tracking. Duty/VAT figures come from GS's sourced per-country, per-product-category rules (87 countries; see [docs/duties.md](docs/duties.md)) and are always labelled estimates with a range.
