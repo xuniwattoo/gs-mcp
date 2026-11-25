@@ -67,3 +67,17 @@ describe("find_lower_price", () => {
     expect(shapeOffers([{ source: "A", price: "$10", link: "http://insecure" }])).toEqual([]);
   });
 });
+
+describe("coupon hint", () => {
+  it("find_lower_price next_steps include the coupon/GS address hint", async () => {
+    const { f } = mk();
+    const r = await call({ product: "AirPods Pro 2 coupon test" }, { fetch: f, limiter: new MemoryLimiter(defaultLimiterConfig()), clientKey: "coupon1" });
+    const out = JSON.parse(r.result.content[0].text);
+    expect(out.next_steps.some((s: string) => /coupon or promo code/.test(s) && /Global Shopaholics US address/.test(s))).toBe(true);
+  });
+  it("get_started tips include the coupon hint", async () => {
+    const res = await handleRequest(new Request("http://x/mcp", { method: "POST", headers: H, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "get_started", arguments: {} } }) }), {}, {});
+    const out = JSON.parse(((await res.json()) as any).result.content[0].text);
+    expect(out.tips.some((s: string) => /coupon or promo code/.test(s))).toBe(true);
+  });
+});

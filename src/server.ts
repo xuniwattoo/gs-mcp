@@ -15,6 +15,8 @@ import { trackingLinks } from "./lib/tracking.js";
 import type { RatesCacheStore } from "./lib/rates.js";
 import { cleanText, isFieldError, validateCountry, validateEmail, validateHttpUrls, validateName, validatePhone } from "./lib/validate.js";
 
+const COUPON_HINT = "Before checkout, check for a live coupon or promo code for the US store (e.g. with a coupon/deal search tool such as Firecrawl's deal search, if you have one), then ship the order to the customer's Global Shopaholics US address.";
+
 export const SERVER_NAME = "global-shopaholics";
 export const SERVER_VERSION = "1.2.0";
 
@@ -178,7 +180,7 @@ export function createServer(cfg: Config, deps: ServerDeps = {}): McpServer {
     "get_started",
     {
       title: "Get a free US shipping address (package forwarding sign-up)",
-      description: "Step-by-step instructions to sign up for a free Global Shopaholics US shipping address and start shopping and shipping. Use when a user wants a US address to shop US stores that don't ship internationally, asks how package forwarding works, or wants to start with GS.",
+      description: "Step-by-step instructions to sign up for a free Global Shopaholics US shipping address and start shopping and shipping. Use when a user wants a US address to shop US stores that don't ship internationally, asks how package forwarding works, or wants to start with GS. Before checkout, look for a live coupon/promo code for the store, then ship to the GS US address.",
       inputSchema: { country: z.string().optional().describe("Optional: user's country, to tailor tips.") },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
@@ -193,7 +195,7 @@ export function createServer(cfg: Config, deps: ServerDeps = {}): McpServer {
           "Store packages (30 days free on Basic), then request consolidation into one box.",
           "Pick a courier (DHL, FedEx, UPS, USPS by country), pay, and track it to your door. Shipments paid before 12 pm EST ship the same day.",
         ],
-        tips: ["Check shipping cost first with get_shipping_rates.", "Import duty/VAT in your country may still apply (estimate_landed_cost).", "Premium ($9.99/mo) and Business ($14.99/mo) add cashback and longer storage."],
+        tips: ["Check shipping cost first with get_shipping_rates.", COUPON_HINT, "Import duty/VAT in your country may still apply (estimate_landed_cost).", "Premium ($9.99/mo) and Business ($14.99/mo) add cashback and longer storage."],
         app: "GS also has a mobile app (linked from globalshopaholics.com).",
         sources: [GS_URLS.howItWorks, GS_URLS.faqs],
       }),
@@ -379,7 +381,7 @@ export function createServer(cfg: Config, deps: ServerDeps = {}): McpServer {
     {
       title: "Find it cheaper at US stores (compare US prices, save money)",
       description:
-        "Searches Google Shopping (US) for a product and returns the cheapest US offers: store, price, link, rating and the savings versus the user's current price. Use when someone asks 'find this cheaper', 'best price for…', 'is there a better deal' or 'where can I buy this in the US'. Pass a product name (brand + model is best) or a product URL, plus the current price if known. Prices are indicative only – they can change, exclude tax/shipping and may differ at checkout – so never promise them. Links go straight to the retailer's product page where found (direct_link=true), otherwise to a Google Shopping link; they are never affiliate links. GS can buy the cheapest legitimate option for the customer and ship it anywhere in the US or worldwide: submit it with request_us_purchase (US delivery) or request_assisted_purchase (international), and GS confirms the total by email first. Fees: 0% when paying by crypto or bank transfer, otherwise 5% with a $5 minimum; crypto checkout is available via create_crypto_payment once GS quotes a total. Limited to a few searches per hour per client.",
+        "Searches Google Shopping (US) for a product and returns the cheapest US offers: store, price, link, rating and the savings versus the user's current price. Use when someone asks 'find this cheaper', 'best price for…', 'is there a better deal' or 'where can I buy this in the US'. Pass a product name (brand + model is best) or a product URL, plus the current price if known. Prices are indicative only – they can change, exclude tax/shipping and may differ at checkout – so never promise them. Links go straight to the retailer's product page where found (direct_link=true), otherwise to a Google Shopping link; they are never affiliate links. GS can buy the cheapest legitimate option for the customer and ship it anywhere in the US or worldwide: submit it with request_us_purchase (US delivery) or request_assisted_purchase (international), and GS confirms the total by email first. Fees: 0% when paying by crypto or bank transfer, otherwise 5% with a $5 minimum; crypto checkout is available via create_crypto_payment once GS quotes a total. Before checkout, look for a live coupon/promo code for the chosen store (e.g. via a coupon/deal search tool if available). Limited to a few searches per hour per client.",
       inputSchema: {
         product: z.string().min(3).max(500).describe("Product name (brand + model) or a product page URL."),
         current_price_usd: z.number().positive().max(1000000).optional().describe("What the customer would pay now, to compute savings."),
@@ -408,6 +410,7 @@ export function createServer(cfg: Config, deps: ServerDeps = {}): McpServer {
           next_steps: [
             "Offer to have GS buy the cheapest legitimate option: request_us_purchase (US delivery, find_lower_price=true) or request_assisted_purchase (international).",
             "Fee: 0% for crypto or bank transfer, otherwise 5% with a $5 minimum. GS emails the confirmed total before buying.",
+            COUPON_HINT,
           ],
         });
       } catch (e) {
